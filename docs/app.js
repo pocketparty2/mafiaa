@@ -635,10 +635,14 @@ $("create-form").addEventListener("submit", async event => {
   }
 });
 
+
 $("join-form").addEventListener("submit", async event => {
   event.preventDefault();
 
-  if (!currentUser) return;
+  if (!currentUser) {
+    showNotice("Please sign in before joining a room.", true);
+    return;
+  }
 
   const code = $("room-code").value.trim().toUpperCase();
 
@@ -647,54 +651,59 @@ $("join-form").addEventListener("submit", async event => {
     return;
   }
 
-  const button = $("join-form").querySelector('button[type="submit"]');
+  const form = $("join-form");
+  const button = form.querySelector('button[type="submit"]');
 
   try {
     button.disabled = true;
 
-    await runTransaction(db, async transaction => {
-      const ref = roomRef(code);
-      const snapshot = await transaction.get(ref);
+    const ref = roomRef(code);
+    const snapshot = await getDoc(ref);
 
-      if (!snapshot.exists()) {
-        throw new Error("No room exists with that code.");
-      }
+    if (!snapshot.exists()) {
+      throw new Error("No room exists with that code.");
+    }
 
-      const data = snapshot.data();
-      const members = data.memberUids || [];
-      const alreadyMember = members.includes(currentUser.uid);
+    const data = snapshot.data();
+    const members = data.memberUids || [];
+    const alreadyMember = members.includes(currentUser.uid);
 
-      if (data.phase !== "lobby" && !alreadyMember) {
-        throw new Error("That game has already started.");
-      }
+    if (data.phase !== "lobby" && !alreadyMember) {
+      throw new Error("That game has already started.");
+    }
 
-      if (!alreadyMember && members.length >= MAX_PLAYERS) {
-        throw new Error("That room is full.");
-      }
+    if (!alreadyMember && members.length >= MAX_PLAYERS) {
+      throw new Error("That room is full.");
+    }
 
-      if (!alreadyMember) {
-        transaction.update(ref, {
-          memberUids: [...members, currentUser.uid],
-          updatedAt: serverTimestamp()
-        });
-      }
-
-      transaction.set(playerRef(currentUser.uid, code), {
-        uid: currentUser.uid,
-        name: getDisplayName(),
-        avatarData: profile.avatarData || "",
-        ready: false,
-        alive: true,
-        roleReveal: null,
-        joinedAt: serverTimestamp()
+    if (!alreadyMember) {
+      await updateDoc(ref, {
+        memberUids: arrayUnion(currentUser.uid),
+        updatedAt: serverTimestamp()
       });
+    }
+
+    await setDoc(playerRef(currentUser.uid, code), {
+      uid: currentUser.uid,
+      name: getDisplayName(),
+      avatarData: profile.avatarData || "",
+      ready: false,
+      alive: true,
+      roleReveal: null,
+      joinedAt: serverTimestamp()
     });
 
     roomCode = code;
     connectToRoom(code);
     showNotice(`Joined room ${code}!`);
+
   } catch (error) {
-    showNotice(`Couldn't join room: ${friendlyError(error)}`, true);
+    console.error("Join room failed:", error);
+
+    showNotice(
+      `Couldn't join room: ${friendlyError(error)}`,
+      true
+    );
   } finally {
     button.disabled = false;
   }
