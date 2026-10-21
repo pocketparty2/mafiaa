@@ -18,10 +18,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyD0ZjBJ243WhZHxsDldwAMjEIB3Cb9jBKo",
+  authDomain: "mafia-f53f0.firebaseapp.com",
+  projectId: "mafia-f53f0",
+  storageBucket: "mafia-f53f0.firebasestorage.app",
+  messagingSenderId: "148659345455",
+  appId: "1:148659345455:web:044ea140e1ee3678910eda",
+  measurementId: "G-MMEZ6XBC76"
 };
 
 const app = initializeApp(firebaseConfig);
