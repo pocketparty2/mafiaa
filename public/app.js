@@ -252,9 +252,14 @@ $("submit-vote").addEventListener("click", () => {
 });
 
 $("leave-room").addEventListener("click", () => {
-  resetRoomView();
-  showScreen("home");
-  clearNotice();
+  if (!roomCode) return;
+
+  runAction(async () => {
+    await call("leaveRoom", { code: roomCode });
+    resetRoomView();
+    showScreen("home");
+    clearNotice();
+  });
 });
 
 function connectToRoom(code) {
