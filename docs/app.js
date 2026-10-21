@@ -659,6 +659,7 @@ $("join-form").addEventListener("submit", async event => {
     button.disabled = true;
 
     const ref = roomRef(code);
+    console.log("JOIN STEP 1: Reading room");
     const snapshot = await getDoc(ref);
 
     if (!snapshot.exists()) {
@@ -678,12 +679,14 @@ $("join-form").addEventListener("submit", async event => {
     }
 
     if (!alreadyMember) {
+      console.log("JOIN STEP 2: Updating membership");
       await updateDoc(ref, {
         memberUids: arrayUnion(currentUser.uid),
         updatedAt: serverTimestamp()
       });
     }
 
+    console.log("JOIN STEP 2: Updating membership");
     await setDoc(playerRef(currentUser.uid, code), {
       uid: currentUser.uid,
       name: getDisplayName(),
