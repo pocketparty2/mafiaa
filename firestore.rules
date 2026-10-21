@@ -1,5 +1,4 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -7,23 +6,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function validProfile(data) {
-      return data.keys().hasOnly([
-          'displayName',
-          'avatarData',
-          'updatedAt'
-        ])
-        && data.keys().hasAll([
-          'displayName',
-          'avatarData',
-          'updatedAt'
-        ])
-        && data.displayName is string
-        && data.displayName.size() >= 2
-        && data.displayName.size() <= 18
-        && data.avatarData is string
-        && data.avatarData.size() <= 150000
-        && data.updatedAt == request.time;
+    function roomPath(code) {
+      return /databases/$(database)/documents/rooms/$(code);
+    }
+
+    function isMember(code) {
+      return signedIn()
+        && exists(roomPath(code))
+        && request.auth.uid in get(roomPath(code)).data.memberUids;
+    }
+
+    function isHost(code) {
+      return signedIn()
+        && exists(roomPath(code))
+        && get(roomPath(code)).data.hostUid == request.auth.uid;
     }
 
     match /users/{userId} {
@@ -32,36 +28,113 @@ service cloud.firestore {
 
       allow create, update: if signedIn()
         && request.auth.uid == userId
-        && validProfile(request.resource.data);
+        && request.resource.data.keys().hasOnly([
+          'displayName', 'avatarData', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'displayName', 'avatarData', 'updatedAt'
+        ])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 18
+        && request.resource.data.avatarData is string
+        && request.resource.data.avatarData.size() <= 150000
+        && request.resource.data.updatedAt == request.time;
 
       allow delete: if false;
     }
 
-    function isRoomMember(roomCode) {
-      return signedIn()
-        && exists(
-          /databases/$(database)/documents/rooms/$(roomCode)
-        )
-        && request.auth.uid in get(
-          /databases/$(database)/documents/rooms/$(roomCode)
-        ).data.memberUids;
-    }
+    match /rooms/{code} {
+      allow read: if isMember(code);
 
-    match /rooms/{roomCode} {
-      allow read: if isRoomMember(roomCode);
-      allow write: if false;
+      allow create: if signedIn()
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.memberUids == [request.auth.uid]
+        && request.resource.data.phase == 'lobby';
+
+      allow update: if
+        // Current host can manage the room.
+        isHost(code)
+
+        // A new player can join a lobby.
+        || (
+          signedIn()
+          && resource.data.phase == 'lobby'
+          && !(request.auth.uid in resource.data.memberUids)
+          && request.auth.uid in request.resource.data.memberUids
+          && request.resource.data.memberUids.size()
+            == resource.data.memberUids.size() + 1
+          && request.resource.data.memberUids.size() <= 12
+          && request.resource.data.diff(resource.data)
+            .affectedKeys().hasOnly(['memberUids', 'updatedAt'])
+        )
+
+        // An existing player can leave.
+        || (
+          signedIn()
+          && request.auth.uid in resource.data.memberUids
+          && !(request.auth.uid in request.resource.data.memberUids)
+          && request.resource.data.memberUids.size()
+            == resource.data.memberUids.size() - 1
+          && request.resource.data.diff(resource.data)
+            .affectedKeys().hasOnly(['memberUids', 'hostUid', 'updatedAt'])
+        );
+
+      allow delete: if false;
 
       match /players/{playerUid} {
-        allow read: if isRoomMember(roomCode);
-        allow write: if false;
+        allow read: if isMember(code);
+
+        allow create: if isHost(code)
+          || (
+            signedIn()
+            && request.auth.uid == playerUid
+            && request.auth.uid in getAfter(roomPath(code)).data.memberUids
+          );
+
+        allow update: if isHost(code)
+          || (
+            signedIn()
+            && request.auth.uid == playerUid
+            && isMember(code)
+            && request.resource.data.diff(resource.data)
+              .affectedKeys().hasOnly(['ready'])
+            && request.resource.data.ready is bool
+          );
+
+        allow delete: if isHost(code)
+          || (
+            signedIn()
+            && request.auth.uid == playerUid
+          );
       }
 
-      match /private/{document=**} {
-        allow read, write: if false;
+      match /private/{playerUid} {
+        allow read: if signedIn()
+          && (
+            request.auth.uid == playerUid
+            || isHost(code)
+          );
+
+        allow write: if isHost(code);
       }
 
-      match /actions/{document=**} {
-        allow read, write: if false;
+      match /actions/{playerUid} {
+        allow read: if signedIn()
+          && (
+            request.auth.uid == playerUid
+            || isHost(code)
+          );
+
+        allow create, update: if signedIn()
+          && request.auth.uid == playerUid
+          && isMember(code);
+
+        allow delete: if isHost(code)
+          || (
+            signedIn()
+            && request.auth.uid == playerUid
+          );
       }
     }
 
