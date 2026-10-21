@@ -1,5 +1,5 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {
   getAuth,
   createUserWithEmailAndPassword,
@@ -11,7 +11,6 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
-
 import {
   getFirestore,
   doc,
@@ -19,17 +18,11 @@ import {
   onSnapshot,
   getDoc,
   setDoc,
+  updateDoc,
+  deleteDoc,
+  runTransaction,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
-
-import {
-  getFunctions,
-  httpsCallable
-} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
-
-// --------------------------------------------------
-// FIREBASE
-// --------------------------------------------------
 
 const firebaseConfig = {
   apiKey: "AIzaSyD0ZjBJ243WhZHxsDldwAMjEIB3Cb9jBKo",
@@ -44,270 +37,291 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const functions = getFunctions(app, "europe-west1");
-
-const call = (name, data) =>
-  httpsCallable(functions, name)(data).then(result => result.data);
-
-// --------------------------------------------------
-// DOM HELPERS
-// --------------------------------------------------
 
 const $ = id => document.getElementById(id);
 
-function on(id, eventName, handler) {
-  const element = $(id);
-  if (element) element.addEventListener(eventName, handler);
-}
-
-function setText(id, value) {
-  const element = $(id);
-  if (element) element.textContent = value;
-}
-
-function setHidden(id, hidden) {
-  const element = $(id);
-  if (element) element.classList.toggle("hidden", hidden);
-}
-
-const screens = {
-  auth: $("auth-screen"),
-  home: $("home-screen"),
-  game: $("game-screen")
-};
-
-// --------------------------------------------------
-// APPLICATION STATE
-// --------------------------------------------------
+const GAME_LENGTH = 12;
+const NIGHT_SECONDS = 35;
+const DISCUSSION_SECONDS = 25;
+const VOTING_SECONDS = 35;
+const MAX_PLAYERS = 12;
+const MIN_PLAYERS = 5;
 
 let currentUser = null;
+let profile = { displayName: "", avatarData: "" };
+let pendingSignupAvatar = "";
+let pendingEditAvatar = null;
+let signupMode = false;
+
 let roomCode = null;
-let roomData = null;
+let room = null;
 let players = [];
-let myState = null;
+let privateByUid = {};
+let actionsByUid = {};
+let myAction = null;
 
-let stopRoomListener = null;
-let stopPlayersListener = null;
+let unsubRoom = null;
+let unsubPlayers = null;
+let unsubPrivate = null;
+let unsubActions = null;
+let unsubMyPrivate = null;
+let unsubMyAction = null;
+
 let timerHandle = null;
-let pollHandle = null;
+let resolving = false;
+let leavingRoom = false;
 
-let lastStateKey = "";
-let busy = false;
+function showNotice(message, isError = false) {
+  const el = $("notice");
+  el.textContent = message;
+  el.classList.remove("hidden");
+  el.classList.toggle("error", isError);
 
-let profile = {
-  displayName: "",
-  avatarData: ""
-};
-
-let signupAvatarData = "";
-let editAvatarData = "";
-
-// --------------------------------------------------
-// SCREENS AND NOTIFICATIONS
-// --------------------------------------------------
-
-function showScreen(name) {
-  Object.entries(screens).forEach(([key, element]) => {
-    if (element) {
-      element.classList.toggle("hidden", key !== name);
-    }
-  });
-}
-
-function notify(message, type = "") {
-  const box = $("notice");
-  if (!box) return;
-
-  box.textContent = message;
-  box.className = `notice ${type}`.trim();
-  box.classList.remove("hidden");
-}
-
-function clearNotice() {
-  $("notice")?.classList.add("hidden");
+  window.clearTimeout(showNotice.timeout);
+  showNotice.timeout = window.setTimeout(() => {
+    el.classList.add("hidden");
+  }, 5000);
 }
 
 function friendlyError(error) {
   const messages = {
-    "auth/email-already-in-use":
-      "That email already has an account.",
-
-    "auth/invalid-email":
-      "Please enter a valid email address.",
-
-    "auth/invalid-credential":
-      "Email or password is incorrect.",
-
-    "auth/weak-password":
-      "Choose a stronger password.",
-
-    "auth/too-many-requests":
-      "Too many attempts. Please try again later.",
-
-    "auth/requires-recent-login":
-      "For security, sign in again before changing those account details.",
-
-    "functions/unauthenticated":
-      "Please sign in again.",
-
-    "functions/permission-denied":
-      "You aren't allowed to do that.",
-
-    "functions/not-found":
-      "That room could not be found.",
-
-    "functions/failed-precondition":
-      "That action isn't available right now.",
-
-    "functions/resource-exhausted":
-      "The room is full or temporarily unavailable.",
-
-    "permission-denied":
-      "Firebase denied that operation. Check your Firestore rules.",
-
-    "unavailable":
-      "Firebase is temporarily unavailable. Try again shortly."
+    "auth/email-already-in-use": "That email already has an account. Try signing in.",
+    "auth/invalid-email": "Enter a valid email address.",
+    "auth/invalid-credential": "That email and password combination wasn't accepted.",
+    "auth/weak-password": "Choose a password with at least 6 characters.",
+    "auth/requires-recent-login": "Sign in again before changing those account details.",
+    "auth/too-many-requests": "Too many attempts. Wait a little and try again.",
+    "permission-denied": "Firebase blocked that action. Check that your Firestore rules have been published.",
+    "unavailable": "Firebase is temporarily unavailable. Try again shortly."
   };
 
-  return messages[error.code] ||
-    error.message ||
-    "Something went wrong. Please try again.";
+  const code = error?.code || "";
+  const key = code.startsWith("firestore/")
+    ? code.slice("firestore/".length)
+    : code;
+
+  return messages[key] || error?.message || "Something went wrong.";
 }
 
-async function runAction(task, successMessage) {
-  if (busy) return;
+function setVisible(id, visible) {
+  $(id)?.classList.toggle("hidden", !visible);
+}
 
-  busy = true;
-  clearNotice();
+function showScreen(screen) {
+  setVisible("auth-screen", screen === "auth");
+  setVisible("home-screen", screen === "home");
+  setVisible("game-screen", screen === "game");
+  setVisible("signout", Boolean(currentUser));
+}
 
-  try {
-    await task();
+function cleanName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 18);
+}
 
-    if (successMessage) {
-      notify(successMessage, "success");
-    }
-  } catch (error) {
-    console.error(error);
-    notify(friendlyError(error), "error");
-  } finally {
-    busy = false;
+function getDisplayName() {
+  return cleanName(profile.displayName) ||
+    cleanName(currentUser?.email?.split("@")[0]) ||
+    "Player";
+}
+
+function roomRef(code = roomCode) {
+  return doc(db, "rooms", code);
+}
+
+function playersRef(code = roomCode) {
+  return collection(db, "rooms", code, "players");
+}
+
+function playerRef(uid, code = roomCode) {
+  return doc(db, "rooms", code, "players", uid);
+}
+
+function privateRef(uid, code = roomCode) {
+  return doc(db, "rooms", code, "private", uid);
+}
+
+function actionsRef(code = roomCode) {
+  return collection(db, "rooms", code, "actions");
+}
+
+function actionRef(uid, code = roomCode) {
+  return doc(db, "rooms", code, "actions", uid);
+}
+
+function isHost() {
+  return Boolean(currentUser && room?.hostUid === currentUser.uid);
+}
+
+function me() {
+  return players.find(player => player.id === currentUser?.uid) || null;
+}
+
+function myRole() {
+  return privateByUid[currentUser?.uid]?.role || null;
+}
+
+function alivePlayers() {
+  return players.filter(player => player.alive !== false);
+}
+
+function playerName(uid) {
+  return players.find(player => player.id === uid)?.name || "Unknown player";
+}
+
+function shuffle(items) {
+  const result = [...items];
+
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
   }
+
+  return result;
 }
 
-// --------------------------------------------------
-// PROFILE: AVATARS AND IMAGE COMPRESSION
-// --------------------------------------------------
+function randomRoomCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  return Array.from(
+    { length: 4 },
+    () => alphabet[Math.floor(Math.random() * alphabet.length)]
+  ).join("");
+}
 
-function renderAvatar(element, imageData, name = "") {
+function secondsUntil(timestamp) {
+  if (!timestamp) return 0;
+
+  const milliseconds = typeof timestamp.toMillis === "function"
+    ? timestamp.toMillis()
+    : Number(timestamp);
+
+  return Math.max(0, Math.ceil((milliseconds - Date.now()) / 1000));
+}
+
+function timestampAfter(seconds) {
+  return new Date(Date.now() + seconds * 1000);
+}
+
+function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+function phaseDuration(phase) {
+  if (phase === "night") return NIGHT_SECONDS;
+  if (phase === "discussion") return DISCUSSION_SECONDS;
+  if (phase === "voting") return VOTING_SECONDS;
+  return 0;
+}
+
+function escapeText(value) {
+  return String(value ?? "");
+}
+
+/* -------------------- PROFILE IMAGES -------------------- */
+
+async function resizeImage(file) {
+  if (!file) return "";
+
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Please choose an image file.");
+  }
+
+  if (file.size > 8 * 1024 * 1024) {
+    throw new Error("Please choose an image smaller than 8 MB.");
+  }
+
+  const bitmap = await createImageBitmap(file);
+  const maxDimension = 240;
+  const scale = Math.min(
+    1,
+    maxDimension / Math.max(bitmap.width, bitmap.height)
+  );
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+
+  const context = canvas.getContext("2d");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  let quality = 0.82;
+  let data = canvas.toDataURL("image/jpeg", quality);
+
+  while (data.length > 140000 && quality > 0.35) {
+    quality -= 0.1;
+    data = canvas.toDataURL("image/jpeg", quality);
+  }
+
+  if (data.length > 150000) {
+    throw new Error("That image is too large even after resizing. Try another image.");
+  }
+
+  return data;
+}
+
+function renderAvatar(element, data, name = "") {
   if (!element) return;
 
   element.replaceChildren();
 
-  if (imageData) {
+  if (data) {
     const image = document.createElement("img");
-    image.src = imageData;
+    image.src = data;
     image.alt = name ? `${name}'s profile picture` : "Profile picture";
+    image.className = "avatar-image";
     element.append(image);
   } else {
-    element.textContent =
-      (name || "?").trim().slice(0, 1).toUpperCase() || "?";
+    element.textContent = (name.trim()[0] || "?").toUpperCase();
   }
 }
 
-async function compressImage(file) {
-  if (!file || !file.type.startsWith("image/")) {
-    throw new Error("Please choose an image file.");
+function renderProfile() {
+  const name = getDisplayName();
+
+  $("profile-display-name").textContent = name;
+  $("profile-email").textContent = currentUser?.email || "";
+
+  renderAvatar($("profile-avatar"), profile.avatarData, name);
+
+  if ($("edit-display-name")) {
+    $("edit-display-name").value = name;
   }
 
-  const image = new Image();
-  const objectUrl = URL.createObjectURL(file);
+  if ($("edit-email")) {
+    $("edit-email").value = currentUser?.email || "";
+  }
 
-  try {
-    await new Promise((resolve, reject) => {
-      image.onload = resolve;
-      image.onerror = () => {
-        reject(new Error("Couldn't open that image."));
-      };
-      image.src = objectUrl;
-    });
+  if ($("edit-avatar-preview")) {
+    renderAvatar($("edit-avatar-preview"), pendingEditAvatar ?? profile.avatarData, name);
+  }
 
-    const maxSide = 256;
-    const scale = Math.min(
-      1,
-      maxSide / Math.max(image.width, image.height)
-    );
-
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(image.width * scale));
-    canvas.height = Math.max(1, Math.round(image.height * scale));
-
-    const context = canvas.getContext("2d");
-
-    if (!context) {
-      throw new Error("Your browser couldn't process that image.");
-    }
-
-    context.drawImage(
-      image,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    let quality = 0.8;
-    let result = canvas.toDataURL("image/jpeg", quality);
-
-    while (result.length > 120000 && quality > 0.25) {
-      quality -= 0.1;
-      result = canvas.toDataURL("image/jpeg", quality);
-    }
-
-    if (result.length > 150000) {
-      throw new Error(
-        "That picture is too large to save. Try another image."
-      );
-    }
-
-    return result;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
+  if ($("signup-avatar-preview")) {
+    renderAvatar($("signup-avatar-preview"), pendingSignupAvatar, name);
   }
 }
-
-// --------------------------------------------------
-// PROFILE: FIRESTORE STORAGE
-// --------------------------------------------------
 
 async function saveProfileDocument(displayName, avatarData) {
-  if (!currentUser) {
-    throw new Error("Please sign in before saving your profile.");
-  }
-
   await setDoc(doc(db, "users", currentUser.uid), {
-    displayName,
-    avatarData,
+    displayName: cleanName(displayName),
+    avatarData: avatarData || "",
     updatedAt: serverTimestamp()
   });
 }
 
-async function loadProfile(user) {
-  const profileRef = doc(db, "users", user.uid);
-  const snapshot = await getDoc(profileRef);
+async function loadProfile() {
+  const snapshot = await getDoc(doc(db, "users", currentUser.uid));
 
   if (snapshot.exists()) {
-    const saved = snapshot.data();
-
+    const data = snapshot.data();
     profile = {
-      displayName: saved.displayName || "",
-      avatarData: saved.avatarData || ""
+      displayName: cleanName(data.displayName),
+      avatarData: data.avatarData || ""
     };
   } else {
-    const emailName = (user.email || "").split("@")[0];
-
     profile = {
-      displayName:
-        (user.displayName || emailName || "Player").slice(0, 18),
+      displayName: cleanName(currentUser.email?.split("@")[0]) || "Player",
       avatarData: ""
     };
   }
@@ -315,916 +329,1295 @@ async function loadProfile(user) {
   renderProfile();
 }
 
-function renderProfile() {
-  const displayName = profile.displayName || "Player";
+/* -------------------- AUTHENTICATION -------------------- */
 
-  setText("profile-display-name", displayName);
-  setText("profile-email", currentUser?.email || "");
+$("signup").addEventListener("click", () => {
+  signupMode = !signupMode;
 
-  renderAvatar(
-    $("profile-avatar"),
-    profile.avatarData,
-    displayName
-  );
+  setVisible("signup-fields", signupMode);
+  $("signup").textContent = signupMode ? "Back to sign in" : "Create account";
+  $("signin").textContent = signupMode ? "Create account" : "Sign in";
 
-  const playerNameInput = $("player-name");
+  $("signup-name").required = signupMode;
+  $("password").autocomplete = signupMode ? "new-password" : "current-password";
+});
 
-  if (playerNameInput) {
-    playerNameInput.value = profile.displayName;
+$("signup-avatar").addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  try {
+    pendingSignupAvatar = await resizeImage(file);
+    renderAvatar($("signup-avatar-preview"), pendingSignupAvatar, $("signup-name").value);
+  } catch (error) {
+    showNotice(friendlyError(error), true);
+    event.target.value = "";
   }
-}
+});
 
-function openProfileEditor() {
-  if (!currentUser) return;
+$("auth-form").addEventListener("submit", async event => {
+  event.preventDefault();
 
-  const nameInput = $("edit-display-name");
-  const emailInput = $("edit-email");
-  const currentPasswordInput = $("current-password");
-  const newPasswordInput = $("new-password");
+  const email = $("email").value.trim();
+  const password = $("password").value;
 
-  if (nameInput) nameInput.value = profile.displayName;
-  if (emailInput) emailInput.value = currentUser.email || "";
+  $("signin").disabled = true;
+  $("signup").disabled = true;
 
-  if (currentPasswordInput) currentPasswordInput.value = "";
-  if (newPasswordInput) newPasswordInput.value = "";
+  try {
+    if (signupMode) {
+      const displayName = cleanName($("signup-name").value);
 
-  editAvatarData = profile.avatarData;
+      if (displayName.length < 2) {
+        throw new Error("Your display name must have at least 2 characters.");
+      }
+
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      currentUser = credential.user;
+
+      profile = {
+        displayName,
+        avatarData: pendingSignupAvatar || ""
+      };
+
+      await saveProfileDocument(profile.displayName, profile.avatarData);
+
+      pendingSignupAvatar = "";
+      $("signup-avatar").value = "";
+      $("signup-name").value = "";
+      $("password").value = "";
+
+      signupMode = false;
+      setVisible("signup-fields", false);
+      $("signup").textContent = "Create account";
+      $("signin").textContent = "Sign in";
+
+      showNotice("Account created. Your profile is ready!");
+      showScreen("home");
+      renderProfile();
+    } else {
+      await signInWithEmailAndPassword(auth, email, password);
+      $("password").value = "";
+    }
+  } catch (error) {
+    showNotice(friendlyError(error), true);
+  } finally {
+    $("signin").disabled = false;
+    $("signup").disabled = false;
+  }
+});
+
+onAuthStateChanged(auth, async user => {
+  currentUser = user;
+
+  if (!user) {
+    disconnectRoomListeners();
+    roomCode = null;
+    room = null;
+    players = [];
+    privateByUid = {};
+    actionsByUid = {};
+    profile = { displayName: "", avatarData: "" };
+    showScreen("auth");
+    return;
+  }
+
+  try {
+    await loadProfile();
+    showScreen(roomCode ? "game" : "home");
+  } catch (error) {
+    showNotice(`Couldn't load your profile: ${friendlyError(error)}`, true);
+    showScreen("home");
+  }
+});
+
+$("signout").addEventListener("click", async () => {
+  try {
+    if (roomCode) {
+      await leaveCurrentRoom(false);
+    }
+
+    await signOut(auth);
+  } catch (error) {
+    showNotice(friendlyError(error), true);
+  }
+});
+
+/* -------------------- PROFILE EDITOR -------------------- */
+
+$("edit-profile-button").addEventListener("click", () => {
+  pendingEditAvatar = null;
+  $("edit-display-name").value = getDisplayName();
+  $("edit-email").value = currentUser.email || "";
+  $("current-password").value = "";
+  $("new-password").value = "";
+  $("edit-avatar").value = "";
 
   renderAvatar(
     $("edit-avatar-preview"),
-    editAvatarData,
-    profile.displayName
+    profile.avatarData,
+    getDisplayName()
   );
 
-  setHidden("profile-editor", false);
-}
+  setVisible("profile-editor", true);
+});
 
-async function saveProfileChanges() {
-  if (!currentUser) {
-    throw new Error("Please sign in again.");
-  }
+$("cancel-profile").addEventListener("click", () => {
+  pendingEditAvatar = null;
+  setVisible("profile-editor", false);
+  renderProfile();
+});
 
-  const displayName = $("edit-display-name")?.value.trim() || "";
-  const email = $("edit-email")?.value.trim() || "";
-  const currentPassword = $("current-password")?.value || "";
-  const newPassword = $("new-password")?.value || "";
+$("edit-avatar").addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-  if (displayName.length < 2 || displayName.length > 18) {
-    throw new Error(
-      "Your display name must be between 2 and 18 characters."
+  try {
+    pendingEditAvatar = await resizeImage(file);
+    renderAvatar(
+      $("edit-avatar-preview"),
+      pendingEditAvatar,
+      $("edit-display-name").value
     );
+  } catch (error) {
+    showNotice(friendlyError(error), true);
+    event.target.value = "";
+  }
+});
+
+$("remove-avatar").addEventListener("click", () => {
+  pendingEditAvatar = "";
+  renderAvatar(
+    $("edit-avatar-preview"),
+    "",
+    $("edit-display-name").value
+  );
+});
+
+$("save-profile").addEventListener("click", async () => {
+  const displayName = cleanName($("edit-display-name").value);
+  const email = $("edit-email").value.trim();
+  const currentPassword = $("current-password").value;
+  const newPassword = $("new-password").value;
+  const avatarData = pendingEditAvatar === null
+    ? profile.avatarData
+    : pendingEditAvatar;
+
+  if (displayName.length < 2) {
+    showNotice("Your display name must have at least 2 characters.", true);
+    return;
   }
 
   if (!email) {
-    throw new Error("Enter a valid email address.");
-  }
-
-  if (newPassword && newPassword.length < 6) {
-    throw new Error(
-      "Your new password must be at least 6 characters."
-    );
+    showNotice("Enter a valid email address.", true);
+    return;
   }
 
   const emailChanged = email !== currentUser.email;
-  const passwordChanged = newPassword.length > 0;
+  const passwordChanged = Boolean(newPassword);
 
-  if (emailChanged || passwordChanged) {
-    if (!currentPassword) {
-      throw new Error(
-        "Enter your current password to change your email or password."
+  try {
+    $("save-profile").disabled = true;
+
+    if (emailChanged || passwordChanged) {
+      if (!currentPassword) {
+        throw new Error("Enter your current password to change your email or password.");
+      }
+
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
       );
+
+      await reauthenticateWithCredential(currentUser, credential);
     }
-
-    if (!currentUser.email) {
-      throw new Error(
-        "This account doesn't have a password-based email login."
-      );
-    }
-
-    const credential = EmailAuthProvider.credential(
-      currentUser.email,
-      currentPassword
-    );
-
-    await reauthenticateWithCredential(currentUser, credential);
 
     if (emailChanged) {
       await updateEmail(currentUser, email);
     }
 
     if (passwordChanged) {
+      if (newPassword.length < 6) {
+        throw new Error("Your new password must have at least 6 characters.");
+      }
+
       await updatePassword(currentUser, newPassword);
     }
+
+    await saveProfileDocument(displayName, avatarData);
+
+    profile = { displayName, avatarData };
+    pendingEditAvatar = null;
+
+    $("current-password").value = "";
+    $("new-password").value = "";
+
+    renderProfile();
+    setVisible("profile-editor", false);
+    showNotice("Profile updated!");
+  } catch (error) {
+    showNotice(friendlyError(error), true);
+  } finally {
+    $("save-profile").disabled = false;
   }
+});
 
-  await saveProfileDocument(displayName, editAvatarData);
+/* -------------------- ROOM CREATION AND JOINING -------------------- */
 
-  profile = {
-    displayName,
-    avatarData: editAvatarData
-  };
-
-  renderProfile();
-
-  setHidden("profile-editor", true);
-
-  const editAvatarInput = $("edit-avatar");
-  if (editAvatarInput) editAvatarInput.value = "";
-
-  notify("Your profile has been updated!", "success");
-}
-
-// --------------------------------------------------
-// PROFILE: SIGNUP
-// --------------------------------------------------
-
-on("signup", "click", event => {
+$("create-form").addEventListener("submit", async event => {
   event.preventDefault();
 
-  const signupFields = $("signup-fields");
+  if (!currentUser) return;
 
-  // First click opens the extra signup fields.
-  if (signupFields && signupFields.classList.contains("hidden")) {
-    signupFields.classList.remove("hidden");
+  const name = getDisplayName();
 
-    const nameInput = $("signup-name");
-    if (nameInput) {
-      nameInput.required = true;
-      nameInput.focus();
+  try {
+    const button = $("create-form").querySelector('button[type="submit"]');
+    button.disabled = true;
+
+    let createdCode = null;
+
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const code = randomRoomCode();
+      const ref = roomRef(code);
+
+      try {
+        await runTransaction(db, async transaction => {
+          const existing = await transaction.get(ref);
+
+          if (existing.exists()) {
+            throw new Error("CODE_TAKEN");
+          }
+
+          transaction.set(ref, {
+            code,
+            hostUid: currentUser.uid,
+            memberUids: [currentUser.uid],
+            phase: "lobby",
+            round: 0,
+            settings: { revealRoles: true },
+            winner: null,
+            endsAt: null,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        });
+
+        createdCode = code;
+        break;
+      } catch (error) {
+        if (error.message !== "CODE_TAKEN") throw error;
+      }
     }
 
-    setText("signup", "Finish sign up");
+    if (!createdCode) {
+      throw new Error("Couldn't generate a room code. Please try again.");
+    }
+
+    await setDoc(playerRef(currentUser.uid, createdCode), {
+      uid: currentUser.uid,
+      name,
+      avatarData: profile.avatarData || "",
+      ready: false,
+      alive: true,
+      roleReveal: null,
+      joinedAt: serverTimestamp()
+    });
+
+    roomCode = createdCode;
+    connectToRoom(createdCode);
+    showNotice(`Room ${createdCode} created! Share the code with your friends.`);
+  } catch (error) {
+    showNotice(`Couldn't create room: ${friendlyError(error)}`, true);
+  } finally {
+    const button = $("create-form").querySelector('button[type="submit"]');
+    button.disabled = false;
+  }
+});
+
+$("join-form").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  if (!currentUser) return;
+
+  const code = $("room-code").value.trim().toUpperCase();
+
+  if (!/^[A-HJ-NP-Z]{4}$/.test(code)) {
+    showNotice("Enter a valid four-letter room code.", true);
     return;
   }
 
-  runAction(async () => {
-    const email = $("email")?.value.trim() || "";
-    const password = $("password")?.value || "";
+  const button = $("join-form").querySelector('button[type="submit"]');
 
-    const nameInput = $("signup-name");
-    const playerNameInput = $("player-name");
+  try {
+    button.disabled = true;
 
-    const fallbackName =
-      playerNameInput?.value.trim() ||
-      email.split("@")[0] ||
-      "Player";
+    await runTransaction(db, async transaction => {
+      const ref = roomRef(code);
+      const snapshot = await transaction.get(ref);
 
-    const displayName = (
-      nameInput?.value.trim() || fallbackName
-    ).slice(0, 18);
+      if (!snapshot.exists()) {
+        throw new Error("No room exists with that code.");
+      }
 
-    if (!email || !password) {
-      throw new Error(
-        "Enter your email address and password first."
-      );
-    }
+      const data = snapshot.data();
+      const members = data.memberUids || [];
+      const alreadyMember = members.includes(currentUser.uid);
 
-    if (displayName.length < 2 || displayName.length > 18) {
-      throw new Error(
-        "Your display name must be between 2 and 18 characters."
-      );
-    }
+      if (data.phase !== "lobby" && !alreadyMember) {
+        throw new Error("That game has already started.");
+      }
 
-    const credential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
+      if (!alreadyMember && members.length >= MAX_PLAYERS) {
+        throw new Error("That room is full.");
+      }
 
-    currentUser = credential.user;
+      if (!alreadyMember) {
+        transaction.update(ref, {
+          memberUids: [...members, currentUser.uid],
+          updatedAt: serverTimestamp()
+        });
+      }
 
-    try {
-      await saveProfileDocument(displayName, signupAvatarData);
-
-      profile = {
-        displayName,
-        avatarData: signupAvatarData
-      };
-
-      renderProfile();
-
-      notify("Account created! Your profile is ready.", "success");
-    } catch (error) {
-      console.error("Profile save failed:", error);
-
-      notify(
-        "Your account was created, but the profile couldn't be saved. Check your Firestore rules.",
-        "error"
-      );
-    }
-
-    signupAvatarData = "";
-
-    const avatarInput = $("signup-avatar");
-    if (avatarInput) avatarInput.value = "";
-
-    if (signupFields) signupFields.classList.add("hidden");
-
-    setText("signup", "Create account");
-  });
-});
-
-on("signup-avatar", "change", event => {
-  runAction(async () => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    signupAvatarData = await compressImage(file);
-
-    renderAvatar(
-      $("signup-avatar-preview"),
-      signupAvatarData,
-      $("signup-name")?.value || ""
-    );
-  });
-});
-
-on("signup-name", "input", () => {
-  if (!signupAvatarData) {
-    renderAvatar(
-      $("signup-avatar-preview"),
-      "",
-      $("signup-name")?.value || ""
-    );
-  }
-});
-
-// --------------------------------------------------
-// PROFILE: EDITING
-// --------------------------------------------------
-
-on("edit-profile-button", "click", openProfileEditor);
-
-on("cancel-profile", "click", () => {
-  setHidden("profile-editor", true);
-
-  const avatarInput = $("edit-avatar");
-  if (avatarInput) avatarInput.value = "";
-});
-
-on("edit-avatar", "change", event => {
-  runAction(async () => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    editAvatarData = await compressImage(file);
-
-    renderAvatar(
-      $("edit-avatar-preview"),
-      editAvatarData,
-      $("edit-display-name")?.value || ""
-    );
-  });
-});
-
-on("edit-display-name", "input", () => {
-  if (!editAvatarData) {
-    renderAvatar(
-      $("edit-avatar-preview"),
-      "",
-      $("edit-display-name")?.value || ""
-    );
-  }
-});
-
-on("remove-avatar", "click", () => {
-  editAvatarData = "";
-
-  const avatarInput = $("edit-avatar");
-  if (avatarInput) avatarInput.value = "";
-
-  renderAvatar(
-    $("edit-avatar-preview"),
-    "",
-    $("edit-display-name")?.value || ""
-  );
-});
-
-on("save-profile", "click", () => {
-  runAction(saveProfileChanges);
-});
-
-// --------------------------------------------------
-// AUTHENTICATION
-// --------------------------------------------------
-
-on("auth-form", "submit", event => {
-  event.preventDefault();
-
-  runAction(async () => {
-    await signInWithEmailAndPassword(
-      auth,
-      $("email").value.trim(),
-      $("password").value
-    );
-  });
-});
-
-on("signout", "click", () => {
-  runAction(() => signOut(auth));
-});
-
-// --------------------------------------------------
-// ROOM CREATION AND JOINING
-// --------------------------------------------------
-
-on("create-form", "submit", event => {
-  event.preventDefault();
-
-  runAction(async () => {
-    const name =
-      profile.displayName ||
-      $("player-name").value.trim();
-
-    if (!name) {
-      throw new Error("Choose a display name first.");
-    }
-
-    const result = await call("createRoom", {
-      name,
-      avatarData: profile.avatarData,
-      revealRoles: $("reveal-check").checked
+      transaction.set(playerRef(currentUser.uid, code), {
+        uid: currentUser.uid,
+        name: getDisplayName(),
+        avatarData: profile.avatarData || "",
+        ready: false,
+        alive: true,
+        roleReveal: null,
+        joinedAt: serverTimestamp()
+      });
     });
 
-    connectToRoom(result.code);
-  });
-});
-
-on("join-form", "submit", event => {
-  event.preventDefault();
-
-  runAction(async () => {
-    const code = $("room-code").value.trim().toUpperCase();
-
-    const name =
-      profile.displayName ||
-      $("player-name").value.trim();
-
-    if (!name) {
-      throw new Error("Choose a display name first.");
-    }
-
-    await call("joinRoom", {
-      code,
-      name,
-      avatarData: profile.avatarData
-    });
-
+    roomCode = code;
     connectToRoom(code);
-  });
-});
-
-on("room-code", "input", event => {
-  event.target.value = event.target.value
-    .replace(/[^a-z]/gi, "")
-    .toUpperCase()
-    .slice(0, 4);
-});
-
-on("copy-code", "click", () => {
-  runAction(async () => {
-    if (!roomCode) {
-      throw new Error("You're not in a room.");
-    }
-
-    await navigator.clipboard.writeText(roomCode);
-  }, "Room code copied!");
-});
-
-// --------------------------------------------------
-// ROOM CONTROLS
-// --------------------------------------------------
-
-on("ready-check", "change", event => {
-  if (!roomCode) return;
-
-  runAction(() => call("setReady", {
-    code: roomCode,
-    ready: event.target.checked
-  }));
-});
-
-on("reveal-check", "change", event => {
-  if (!roomCode) return;
-
-  runAction(() => call("setSettings", {
-    code: roomCode,
-    revealRoles: event.target.checked
-  }));
-});
-
-on("start-game", "click", () => {
-  runAction(() => call("startGame", {
-    code: roomCode
-  }));
-});
-
-on("night-buttons", "click", event => {
-  const button = event.target.closest("button[data-action]");
-  if (!button) return;
-
-  const targetUid = $("target-select").value;
-
-  if (!targetUid) {
-    notify("Choose a living player first.", "error");
-    return;
+    showNotice(`Joined room ${code}!`);
+  } catch (error) {
+    showNotice(`Couldn't join room: ${friendlyError(error)}`, true);
+  } finally {
+    button.disabled = false;
   }
-
-  runAction(async () => {
-    await call("submitNightAction", {
-      code: roomCode,
-      action: button.dataset.action,
-      targetUid
-    });
-
-    setText("action-status", "Night action submitted.");
-  });
 });
 
-on("submit-vote", "click", () => {
-  const targetUid = $("target-select").value;
+/* -------------------- ROOM LISTENERS -------------------- */
 
-  if (!targetUid) {
-    notify("Choose a living player first.", "error");
-    return;
+function disconnectRoomListeners() {
+  unsubRoom?.();
+  unsubPlayers?.();
+  unsubPrivate?.();
+  unsubActions?.();
+  unsubMyPrivate?.();
+  unsubMyAction?.();
+
+  unsubRoom = null;
+  unsubPlayers = null;
+  unsubPrivate = null;
+  unsubActions = null;
+  unsubMyPrivate = null;
+  unsubMyAction = null;
+
+  if (timerHandle) {
+    clearInterval(timerHandle);
+    timerHandle = null;
   }
-
-  runAction(async () => {
-    await call("submitVote", {
-      code: roomCode,
-      targetUid
-    });
-
-    setText("action-status", "Vote submitted.");
-  });
-});
-
-on("leave-room", "click", () => {
-  if (!roomCode) return;
-
-  runAction(async () => {
-    await call("leaveRoom", {
-      code: roomCode
-    });
-
-    resetRoomView();
-    showScreen("home");
-    clearNotice();
-  });
-});
-
-// --------------------------------------------------
-// ROOM LISTENERS
-// --------------------------------------------------
-
-function stopListening() {
-  stopRoomListener?.();
-  stopPlayersListener?.();
-
-  stopRoomListener = null;
-  stopPlayersListener = null;
-
-  if (timerHandle) clearInterval(timerHandle);
-  if (pollHandle) clearInterval(pollHandle);
-
-  timerHandle = null;
-  pollHandle = null;
-}
-
-function resetRoomView() {
-  stopListening();
-
-  roomCode = null;
-  roomData = null;
-  players = [];
-  myState = null;
-  lastStateKey = "";
 }
 
 function connectToRoom(code) {
-  resetRoomView();
+  disconnectRoomListeners();
 
   roomCode = code;
-  setText("room-code-display", code);
+  room = null;
+  players = [];
+  privateByUid = {};
+  actionsByUid = {};
+  myAction = null;
+  resolving = false;
+  leavingRoom = false;
+
+  $("room-code-display").textContent = code;
+  $("room-code").value = "";
+
   showScreen("game");
 
-  stopRoomListener = onSnapshot(
-    doc(db, "rooms", code),
-    async snapshot => {
-      if (!snapshot.exists()) {
-        resetRoomView();
-        showScreen("home");
-        notify("This room no longer exists.", "error");
-        return;
-      }
+  unsubRoom = onSnapshot(roomRef(code), snapshot => {
+    if (!snapshot.exists()) {
+      showNotice("This room no longer exists.", true);
+      disconnectRoomListeners();
+      roomCode = null;
+      room = null;
+      showScreen("home");
+      return;
+    }
 
-      roomData = snapshot.data();
+    room = snapshot.data();
 
-      const revealCheck = $("reveal-check");
-      if (revealCheck) {
-        revealCheck.checked =
-          roomData.settings?.revealRoles !== false;
-      }
+    if (!currentUser || !(room.memberUids || []).includes(currentUser.uid)) {
+      showNotice("You've left this room.");
+      disconnectRoomListeners();
+      roomCode = null;
+      room = null;
+      showScreen("home");
+      return;
+    }
 
-      renderRoom();
-
-      try {
-        myState = await call("getMyState", { code });
-
-        if (roomCode === code) {
-          renderRoom();
-        }
-      } catch (error) {
-        console.error("Couldn't refresh private state:", error);
-      }
-    },
-    error => notify(friendlyError(error), "error")
-  );
-
-  stopPlayersListener = onSnapshot(
-    collection(db, "rooms", code, "players"),
-    snapshot => {
-      players = snapshot.docs.map(d => ({
-        uid: d.id,
-        ...d.data()
-      }));
-
-      renderRoom();
-    },
-    error => notify(friendlyError(error), "error")
-  );
-
-  // Cloud Functions are still responsible for advancing game phases.
-  pollHandle = setInterval(() => {
-    if (!roomCode || document.hidden) return;
-
-    call("advanceIfDue", {
-      code: roomCode
-    }).catch(error => {
-      console.error("Phase check failed:", error);
-    });
-  }, 3000);
-
-  timerHandle = setInterval(renderTimer, 250);
-}
-
-// --------------------------------------------------
-// GAME DISPLAY
-// --------------------------------------------------
-
-function phaseDetails(phase) {
-  return {
-    lobby: [
-      "Waiting in lobby",
-      "Get everyone ready before the host starts."
-    ],
-
-    night: [
-      "Nightfall",
-      "Special roles, choose your actions in secret."
-    ],
-
-    discussion: [
-      "Morning discussion",
-      "Talk through the clues and decide who seems suspicious."
-    ],
-
-    voting: [
-      "Voting time",
-      "Choose one living player to eliminate."
-    ],
-
-    finished: [
-      "Game over",
-      "The winner has been decided."
-    ]
-  }[phase] || ["Unknown phase", ""];
-}
-
-function renderRoom() {
-  if (!roomData) return;
-
-  const [title, description] = phaseDetails(roomData.phase);
-
-  setText("phase-title", title);
-  setText("phase-description", description);
-
-  setText(
-    "round-label",
-    roomData.phase === "lobby"
-      ? "Waiting for game to start"
-      : `Round ${roomData.round || 1}`
-  );
-
-  setText("player-count", `${players.length}/12`);
-
-  const isHost = currentUser?.uid === roomData.hostUid;
-  const isLobby = roomData.phase === "lobby";
-  const isAlive = myState?.alive === true;
-
-  setHidden("lobby-controls", !isLobby);
-
-  const readyCheck = $("ready-check");
-  if (readyCheck) {
-    readyCheck.disabled = isHost;
-    readyCheck.checked =
-      players.find(p => p.uid === currentUser?.uid)?.ready === true;
-  }
-
-  setHidden("reveal-setting", !isLobby || !isHost);
-  setHidden("start-game", !isLobby || !isHost);
-
-  const startButton = $("start-game");
-  if (startButton) {
-    startButton.disabled =
-      players.length < 5 ||
-      players.length > 12 ||
-      players.some(p => !p.ready);
-  }
-
-  setHidden(
-    "action-controls",
-    isLobby || roomData.phase === "finished" || !isAlive
-  );
-
-  setHidden(
-    "finished-card",
-    roomData.phase !== "finished"
-  );
-
-  setHidden("role-card", !myState?.role);
-
-  setHidden(
-    "leave-room",
-    roomData.phase === "finished"
-  );
-
-  setText(
-    "winner-text",
-    roomData.winner === "Town"
-      ? "The Town wins!"
-      : roomData.winner === "Mafia"
-        ? "The Mafia wins!"
-        : "Game ended."
-  );
-
-  if (myState?.role) {
-    setText("role-name", myState.role);
-
-    setText(
-      "role-description",
-      ({
-        Mafia:
-          "At night, choose a player to eliminate. Work with your fellow Mafia.",
-
-        Townsperson:
-          "You have no night action. Use discussion and voting to find the Mafia.",
-
-        Detective:
-          "Investigate one player each night to discover whether they are Mafia.",
-
-        Doctor:
-          "Protect one player each night from the Mafia's attack."
-      })[myState.role] || ""
-    );
-
-    setText(
-      "team-info",
-      myState.role === "Mafia"
-        ? "Your fellow Mafia: " +
-          (
-            myState.mafiaTeammates
-              ?.map(p => p.name)
-              .join(", ") || "None"
-          )
-        : ""
-    );
-
-    const investigation = myState.investigation;
-
-    setText(
-      "investigation-result",
-      investigation
-        ? `Round ${investigation.round}: ${investigation.targetName} ${
-            investigation.isMafia
-              ? "is Mafia."
-              : "is not Mafia."
-          }`
-        : ""
-    );
-  }
-
-  const canNightAct =
-    roomData.phase === "night" && isAlive;
-
-  const role = myState?.role;
-
-  setHidden("night-buttons", !canNightAct);
-
-  setHidden(
-    "submit-vote",
-    roomData.phase !== "voting" || !isAlive
-  );
-
-  const actionForRole = ({
-    Mafia: "kill",
-    Detective: "investigate",
-    Doctor: "protect"
-  })[role];
-
-  $("night-buttons")?.querySelectorAll("button").forEach(button => {
-    button.classList.toggle(
-      "hidden",
-      !actionForRole || button.dataset.action !== actionForRole
-    );
+    renderGame();
+    maybeResolvePhase();
+  }, error => {
+    showNotice(`Room listener failed: ${friendlyError(error)}`, true);
   });
 
-  renderPlayers();
-  renderTargets();
-  renderTimer();
+  unsubPlayers = onSnapshot(playersRef(code), snapshot => {
+    players = snapshot.docs.map(item => ({
+      id: item.id,
+      ...item.data()
+    }));
+
+    players.sort((a, b) => {
+      if (a.id === room?.hostUid) return -1;
+      if (b.id === room?.hostUid) return 1;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+
+    renderGame();
+    maybeResolvePhase();
+  }, error => {
+    showNotice(`Player list failed: ${friendlyError(error)}`, true);
+  });
+
+  if (currentUser) {
+    unsubMyPrivate = onSnapshot(privateRef(currentUser.uid, code), snapshot => {
+      if (!isHost()) {
+        if (snapshot.exists()) {
+          privateByUid[currentUser.uid] = snapshot.data();
+        } else {
+          delete privateByUid[currentUser.uid];
+        }
+        renderGame();
+      }
+    }, error => {
+      showNotice(`Couldn't load your role: ${friendlyError(error)}`, true);
+    });
+
+    unsubMyAction = onSnapshot(actionRef(currentUser.uid, code), snapshot => {
+      myAction = snapshot.exists() ? snapshot.data() : null;
+      renderGame();
+    }, error => {
+      showNotice(`Couldn't load your action: ${friendlyError(error)}`, true);
+    });
+  }
+
+  // Only the host reads the full private-role and action collections.
+  // Other players can read only their own private role and action.
+  if (room?.hostUid === currentUser?.uid) {
+    attachHostListeners(code);
+  }
+
+  if (timerHandle) clearInterval(timerHandle);
+  timerHandle = setInterval(() => {
+    renderTimer();
+    maybeResolvePhase();
+  }, 1000);
 }
 
-// --------------------------------------------------
-// PLAYER LIST
-// --------------------------------------------------
+function attachHostListeners(code) {
+  unsubPrivate?.();
+  unsubActions?.();
 
-function renderPlayers() {
-  const list = $("player-list");
-  if (!list || !roomData) return;
+  unsubPrivate = onSnapshot(collection(db, "rooms", code, "private"), snapshot => {
+    privateByUid = {};
 
-  list.replaceChildren();
+    snapshot.docs.forEach(item => {
+      privateByUid[item.id] = item.data();
+    });
 
-  for (const player of players) {
-    const row = document.createElement("div");
+    renderGame();
+    maybeResolvePhase();
+  }, error => {
+    showNotice(`Host role listener failed: ${friendlyError(error)}`, true);
+  });
 
-    row.className =
-      "player" + (player.alive ? "" : " dead");
+  unsubActions = onSnapshot(actionsRef(code), snapshot => {
+    actionsByUid = {};
 
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
+    snapshot.docs.forEach(item => {
+      actionsByUid[item.id] = item.data();
+    });
 
-    if (player.avatarData) {
-      const image = document.createElement("img");
-      image.src = player.avatarData;
-      image.alt = "";
-      avatar.append(image);
-    } else {
-      avatar.textContent =
-        (player.name || "?").slice(0, 1).toUpperCase();
+    renderGame();
+    maybeResolvePhase();
+  }, error => {
+    showNotice(`Host action listener failed: ${friendlyError(error)}`, true);
+  });
+}
+
+/* -------------------- GAME RENDERING -------------------- */
+
+function renderGame() {
+  if (!room || !currentUser) return;
+
+  $("room-code-display").textContent = roomCode || "----";
+  $("player-count").textContent = `${players.length}/${MAX_PLAYERS}`;
+
+  const phase = room.phase || "lobby";
+  const host = isHost();
+  const self = me();
+  const role = myRole();
+
+  $("phase-dot").className = `phase-dot phase-${phase}`;
+
+  const phaseTitles = {
+    lobby: "Waiting in lobby",
+    night: "Night has fallen",
+    discussion: "Discussion",
+    voting: "Time to vote",
+    finished: "Game over"
+  };
+
+  const phaseDescriptions = {
+    lobby: host
+      ? "You're hosting. Wait for everyone to join and ready up."
+      : "Wait for the host to start once everyone is ready.",
+    night: "The town is asleep. Your role determines what you can do.",
+    discussion: "Talk it out. Who seems suspicious?",
+    voting: "Choose the player you think should be eliminated.",
+    finished: "The game has ended. See who survived."
+  };
+
+  $("phase-title").textContent = phaseTitles[phase] || "Game in progress";
+  $("phase-description").textContent = phaseDescriptions[phase] || "";
+  $("round-label").textContent = phase === "lobby"
+    ? "Lobby"
+    : phase === "finished"
+      ? `Final round: ${room.round || 1}`
+      : `Round ${room.round || 1}`;
+
+  setVisible("lobby-controls", phase === "lobby");
+  setVisible("action-controls", phase === "night" || phase === "voting");
+  setVisible("finished-card", phase === "finished");
+  setVisible("role-card", Boolean(role) && phase !== "lobby");
+
+  $("ready-check").checked = Boolean(self?.ready);
+  $("ready-check").disabled = phase !== "lobby";
+
+  setVisible("reveal-setting", phase === "lobby" && host);
+  $("reveal-check").checked = room.settings?.revealRoles !== false;
+  $("reveal-check").disabled = !host || phase !== "lobby";
+
+  setVisible("start-game", phase === "lobby" && host);
+  $("start-game").disabled =
+    players.length < MIN_PLAYERS ||
+    players.length > MAX_PLAYERS ||
+    !players.every(player => player.ready);
+
+  if (role) {
+    const roleInfo = {
+      Mafia: {
+        description: "Each night, help eliminate a Town player without being discovered.",
+        team: "You win when the Mafia equal or outnumber the Town."
+      },
+      Detective: {
+        description: "Investigate one living player each night to learn whether they're Mafia.",
+        team: "You win by helping the Town eliminate the Mafia."
+      },
+      Doctor: {
+        description: "Protect one living player each night from the Mafia's attack.",
+        team: "You win by helping the Town eliminate the Mafia."
+      },
+      Townsperson: {
+        description: "You have no special night action. Use discussion and voting to find the Mafia.",
+        team: "You win when all Mafia are eliminated."
+      }
+    };
+
+    $("role-name").textContent = role;
+    $("role-description").textContent = roleInfo[role]?.description || "";
+    $("team-info").textContent = roleInfo[role]?.team || "";
+
+    const investigation = privateByUid[currentUser.uid]?.investigationResult;
+    $("investigation-result").textContent = investigation || "";
+
+    if (role === "Mafia" && privateByUid[currentUser.uid]?.mafiaTeammates?.length) {
+      const names = privateByUid[currentUser.uid].mafiaTeammates
+        .map(uid => playerName(uid))
+        .join(", ");
+      $("team-info").textContent = `Your fellow Mafia: ${names}. You win when the Mafia equal or outnumber the Town.`;
     }
+  } else {
+    $("role-name").textContent = "Not assigned yet";
+    $("role-description").textContent = "";
+    $("investigation-result").textContent = "";
+    $("team-info").textContent = "";
+  }
 
-    const meta = document.createElement("div");
-    meta.className = "player-meta";
+  $("winner-text").textContent = room.winner === "Mafia"
+    ? "The Mafia win."
+    : room.winner === "Town"
+      ? "The Town wins."
+      : "Game over";
 
-    const name = document.createElement("div");
-    name.className = "player-name";
-    name.textContent = player.name || "Player";
+  renderPlayers();
+  renderTargetOptions();
+  renderActionControls();
+  renderTimer();
 
-    if (player.uid === roomData.hostUid) {
-      name.textContent += " ★";
-    }
-
-    const status = document.createElement("div");
-    status.className = "player-status";
-
-    status.textContent = !player.alive
-      ? "Eliminated"
-      : roomData.phase === "lobby"
-        ? (player.ready ? "Ready" : "Not ready")
-        : "In the game";
-
-    meta.append(name, status);
-
-    const tag = document.createElement("span");
-
-    tag.className =
-      "tag" +
-      (!player.alive
-        ? " dead"
-        : player.ready
-          ? " ready"
-          : "");
-
-    tag.textContent = !player.alive
-      ? (player.roleReveal || "Dead")
-      : roomData.phase === "lobby"
-        ? (player.ready ? "READY" : "WAITING")
-        : "ALIVE";
-
-    row.append(avatar, meta, tag);
-    list.append(row);
+  if (phase === "lobby") {
+    $("action-status").textContent = "";
   }
 }
 
-// --------------------------------------------------
-// TARGET SELECTOR
-// --------------------------------------------------
+function renderPlayers() {
+  const container = $("player-list");
+  container.replaceChildren();
 
-function renderTargets() {
+  players.forEach(player => {
+    const row = document.createElement("div");
+    row.className = "player-row";
+
+    if (player.id === currentUser?.uid) row.classList.add("is-you");
+    if (player.alive === false) row.classList.add("is-dead");
+
+    const avatar = document.createElement("div");
+    avatar.className = "profile-avatar player-avatar";
+    renderAvatar(avatar, player.avatarData || "", player.name || "Player");
+
+    const info = document.createElement("div");
+    info.className = "player-info";
+
+    const name = document.createElement("strong");
+    name.textContent = escapeText(player.name || "Player");
+
+    const meta = document.createElement("span");
+    meta.className = "muted small";
+
+    const tags = [];
+    if (player.id === room?.hostUid) tags.push("Host");
+    if (player.id === currentUser?.uid) tags.push("You");
+    if (player.alive === false) tags.push("Eliminated");
+    else if (room?.phase === "lobby") tags.push(player.ready ? "Ready" : "Not ready");
+
+    meta.textContent = tags.join(" · ");
+    info.append(name, meta);
+
+    row.append(avatar, info);
+
+    if (player.alive === false && room?.settings?.revealRoles !== false && player.roleReveal) {
+      const badge = document.createElement("span");
+      badge.className = "role-badge";
+      badge.textContent = player.roleReveal;
+      row.append(badge);
+    }
+
+    container.append(row);
+  });
+}
+
+function renderTargetOptions() {
   const select = $("target-select");
-  if (!select) return;
-
   const previous = select.value;
-
   select.replaceChildren();
 
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = "Select a player...";
+  placeholder.textContent = "Choose a player...";
   select.append(placeholder);
 
-  for (const player of players) {
-    if (!player.alive || player.uid === currentUser?.uid) {
-      continue;
+  const role = myRole();
+  const phase = room?.phase;
+  const selfUid = currentUser?.uid;
+
+  let candidates = alivePlayers();
+
+  if (phase === "night") {
+    if (role === "Mafia") {
+      candidates = candidates.filter(player =>
+        player.id !== selfUid &&
+        privateByUid[player.id]?.role !== "Mafia"
+      );
+    } else if (role === "Detective" || role === "Doctor") {
+      candidates = candidates.filter(player => player.id !== selfUid);
+    } else {
+      candidates = [];
     }
-
-    const option = document.createElement("option");
-    option.value = player.uid;
-    option.textContent = player.name || "Player";
-
-    select.append(option);
+  } else if (phase === "voting") {
+    candidates = candidates.filter(player => player.id !== selfUid);
+  } else {
+    candidates = [];
   }
+
+  candidates.forEach(player => {
+    const option = document.createElement("option");
+    option.value = player.id;
+    option.textContent = player.name || "Player";
+    select.append(option);
+  });
 
   if ([...select.options].some(option => option.value === previous)) {
     select.value = previous;
   }
 }
 
-// --------------------------------------------------
-// PHASE TIMER
-// --------------------------------------------------
+function renderActionControls() {
+  const phase = room?.phase;
+  const role = myRole();
+  const self = me();
+  const alive = self?.alive !== false;
+  const currentAction = myAction &&
+    myAction.phase === phase &&
+    myAction.round === room?.round
+      ? myAction
+      : null;
 
-function renderTimer() {
-  const timer = $("timer");
-  if (!timer) return;
+  const nightEligible = phase === "night" &&
+    alive &&
+    ["Mafia", "Doctor", "Detective"].includes(role);
 
-  if (
-    !roomData?.endsAt ||
-    roomData.phase === "lobby" ||
-    roomData.phase === "finished"
-  ) {
-    timer.textContent = "--:--";
-    return;
+  setVisible("night-buttons", nightEligible);
+  setVisible("submit-vote", phase === "voting" && alive);
+
+  $("night-buttons").querySelectorAll("button").forEach(button => {
+    const actionType = button.dataset.action;
+    const allowed = (
+      (role === "Mafia" && actionType === "kill") ||
+      (role === "Doctor" && actionType === "protect") ||
+      (role === "Detective" && actionType === "investigate")
+    );
+
+    button.classList.toggle("hidden", !allowed);
+    button.disabled = Boolean(currentAction) || !allowed;
+  });
+
+  $("submit-vote").disabled = Boolean(currentAction) || phase !== "voting" || !alive;
+  $("target-select").disabled =
+    (!nightEligible && phase !== "voting") || Boolean(currentAction);
+
+  if (currentAction) {
+    $("action-status").textContent = phase === "voting"
+      ? "Your vote has been submitted."
+      : "Your night action has been submitted.";
+  } else if (!alive && phase !== "lobby" && phase !== "finished") {
+    $("action-status").textContent = "You've been eliminated. You can watch, but you can't act.";
+  } else if (phase === "night" && !nightEligible) {
+    $("action-status").textContent = "Your role has no action tonight.";
+  } else {
+    $("action-status").textContent = "";
   }
-
-  const endTime =
-    typeof roomData.endsAt === "number"
-      ? roomData.endsAt
-      : typeof roomData.endsAt?.toMillis === "function"
-        ? roomData.endsAt.toMillis()
-        : Date.parse(roomData.endsAt);
-
-  if (!Number.isFinite(endTime)) {
-    timer.textContent = "--:--";
-    return;
-  }
-
-  const seconds = Math.max(
-    0,
-    Math.ceil((endTime - Date.now()) / 1000)
-  );
-
-  timer.textContent =
-    `${String(Math.floor(seconds / 60)).padStart(2, "0")}:` +
-    `${String(seconds % 60).padStart(2, "0")}`;
 }
 
-// --------------------------------------------------
-// AUTH STATE
-// --------------------------------------------------
+function renderTimer() {
+  if (!room || !["night", "discussion", "voting"].includes(room.phase)) {
+    $("timer").textContent = "--:--";
+    return;
+  }
 
-onAuthStateChanged(auth, async user => {
-  currentUser = user;
+  $("timer").textContent = formatTime(secondsUntil(room.endsAt));
+}
 
-  setHidden("signout", !user);
+/* -------------------- LOBBY ACTIONS -------------------- */
 
-  if (!user) {
-    resetRoomView();
+$("ready-check").addEventListener("change", async event => {
+  if (!roomCode || room?.phase !== "lobby") return;
 
-    profile = {
-      displayName: "",
-      avatarData: ""
-    };
+  try {
+    await updateDoc(playerRef(currentUser.uid), {
+      ready: event.target.checked
+    });
+  } catch (error) {
+    showNotice(friendlyError(error), true);
+  }
+});
 
-    signupAvatarData = "";
-    editAvatarData = "";
+$("reveal-check").addEventListener("change", async event => {
+  if (!isHost() || room?.phase !== "lobby") return;
 
-    showScreen("auth");
+  try {
+    await updateDoc(roomRef(), {
+      settings: {
+        ...(room.settings || {}),
+        revealRoles: event.target.checked
+      },
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    showNotice(friendlyError(error), true);
+  }
+});
+
+$("start-game").addEventListener("click", startGame);
+
+async function startGame() {
+  if (!isHost() || room?.phase !== "lobby") return;
+
+  if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
+    showNotice(`You need ${MIN_PLAYERS}–${MAX_PLAYERS} players to start.`, true);
+    return;
+  }
+
+  if (!players.every(player => player.ready)) {
+    showNotice("Everyone needs to be ready before the game starts.", true);
     return;
   }
 
   try {
-    await loadProfile(user);
-  } catch (error) {
-    console.error("Profile loading failed:", error);
+    $("start-game").disabled = true;
 
-    notify(
-      "Couldn't load your profile. Check your Firestore rules.",
-      "error"
+    const shuffledPlayers = shuffle(players);
+    const mafiaCount = Math.max(1, Math.floor(players.length / 4));
+
+    const roleAssignments = new Map();
+    shuffledPlayers.forEach((player, index) => {
+      if (index < mafiaCount) roleAssignments.set(player.id, "Mafia");
+      else if (index === mafiaCount) roleAssignments.set(player.id, "Detective");
+      else if (index === mafiaCount + 1) roleAssignments.set(player.id, "Doctor");
+      else roleAssignments.set(player.id, "Townsperson");
+    });
+
+    const mafiaUids = [...roleAssignments.entries()]
+      .filter(([, role]) => role === "Mafia")
+      .map(([uid]) => uid);
+
+    const writes = players.map(async player => {
+      const role = roleAssignments.get(player.id);
+
+      await setDoc(privateRef(player.id), {
+        role,
+        investigationResult: "",
+        mafiaTeammates: role === "Mafia"
+          ? mafiaUids.filter(uid => uid !== player.id)
+          : []
+      });
+
+      await updateDoc(playerRef(player.id), {
+        ready: false,
+        alive: true,
+        roleReveal: null
+      });
+    });
+
+    await Promise.all(writes);
+
+    await Promise.all(
+      Object.keys(actionsByUid).map(uid => deleteDoc(actionRef(uid)))
     );
+
+    await updateDoc(roomRef(), {
+      phase: "night",
+      round: 1,
+      winner: null,
+      endsAt: timestampAfter(NIGHT_SECONDS),
+      updatedAt: serverTimestamp()
+    });
+
+    showNotice("The game has started. Your role is secret!");
+  } catch (error) {
+    showNotice(`Couldn't start the game: ${friendlyError(error)}`, true);
+  } finally {
+    $("start-game").disabled = false;
+  }
+}
+
+/* -------------------- NIGHT ACTIONS AND VOTING -------------------- */
+
+$("night-buttons").addEventListener("click", async event => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+
+  await submitAction(button.dataset.action);
+});
+
+$("submit-vote").addEventListener("click", async () => {
+  await submitAction("vote");
+});
+
+async function submitAction(type) {
+  if (!roomCode || !room || !currentUser) return;
+
+  const role = myRole();
+  const targetUid = $("target-select").value;
+  const phase = room.phase;
+
+  if (phase === "night") {
+    const allowed = (
+      (type === "kill" && role === "Mafia") ||
+      (type === "protect" && role === "Doctor") ||
+      (type === "investigate" && role === "Detective")
+    );
+
+    if (!allowed) {
+      showNotice("Your role can't perform that action.", true);
+      return;
+    }
+  } else if (phase === "voting" && type !== "vote") {
+    return;
+  } else if (phase !== "voting" && phase !== "night") {
+    return;
   }
 
-  if (!roomCode) {
-    showScreen("home");
+  const self = me();
+
+  if (!self || self.alive === false) {
+    showNotice("Eliminated players can't submit actions.", true);
+    return;
+  }
+
+  if (!targetUid) {
+    showNotice("Choose a player first.", true);
+    return;
+  }
+
+  const target = players.find(player => player.id === targetUid);
+
+  if (!target || target.alive === false || targetUid === currentUser.uid) {
+    showNotice("Choose a living player other than yourself.", true);
+    return;
+  }
+
+  const existing = myAction &&
+    myAction.phase === phase &&
+    myAction.round === room.round;
+
+  if (existing) {
+    showNotice("You've already submitted an action this phase.", true);
+    return;
+  }
+
+  try {
+    await setDoc(actionRef(currentUser.uid), {
+      uid: currentUser.uid,
+      type,
+      targetUid,
+      phase,
+      round: room.round,
+      updatedAt: serverTimestamp()
+    });
+
+    showNotice(type === "vote" ? "Vote submitted." : "Night action submitted.");
+  } catch (error) {
+    showNotice(`Couldn't submit action: ${friendlyError(error)}`, true);
+  }
+}
+
+/* -------------------- HOST GAME RESOLUTION -------------------- */
+
+function currentActions(phase) {
+  return Object.entries(actionsByUid)
+    .filter(([, action]) =>
+      action.phase === phase &&
+      action.round === room?.round
+    )
+    .map(([uid, action]) => ({ uid, ...action }));
+}
+
+function hasSubmitted(uid, phase) {
+  const action = actionsByUid[uid];
+  return Boolean(
+    action &&
+    action.phase === phase &&
+    action.round === room?.round
+  );
+}
+
+function requiredNightActors() {
+  return players.filter(player => {
+    if (player.alive === false) return false;
+
+    const role = privateByUid[player.id]?.role;
+    return ["Mafia", "Doctor", "Detective"].includes(role);
+  });
+}
+
+function allRequiredActionsSubmitted() {
+  if (!room || !isHost()) return false;
+
+  if (room.phase === "night") {
+    const actors = requiredNightActors();
+    return actors.length > 0 &&
+      actors.every(player => hasSubmitted(player.id, "night"));
+  }
+
+  if (room.phase === "voting") {
+    const voters = alivePlayers();
+    return voters.length > 0 &&
+      voters.every(player => hasSubmitted(player.id, "voting"));
+  }
+
+  return false;
+}
+
+function maybeResolvePhase() {
+  if (!room || !isHost() || resolving || room.phase === "finished" || room.phase === "lobby") {
+    return;
+  }
+
+  const expired = secondsUntil(room.endsAt) <= 0;
+  const complete = allRequiredActionsSubmitted();
+
+  if (expired || complete) {
+    resolvePhase();
+  }
+}
+
+async function checkWinner() {
+  const living = alivePlayers();
+
+  const mafiaAlive = living.filter(player =>
+    privateByUid[player.id]?.role === "Mafia"
+  ).length;
+
+  const townAlive = living.length - mafiaAlive;
+
+  if (mafiaAlive === 0) return "Town";
+  if (mafiaAlive >= townAlive) return "Mafia";
+
+  return null;
+}
+
+async function revealEliminatedPlayer(uid) {
+  const player = players.find(item => item.id === uid);
+  if (!player) return;
+
+  await updateDoc(playerRef(uid), {
+    alive: false,
+    ready: false,
+    roleReveal: room.settings?.revealRoles === false
+      ? null
+      : (privateByUid[uid]?.role || null)
+  });
+}
+
+async function clearActions() {
+  await Promise.all(
+    Object.keys(actionsByUid).map(uid =>
+      deleteDoc(actionRef(uid)).catch(() => {})
+    )
+  );
+
+  actionsByUid = {};
+  myAction = null;
+}
+
+async function beginPhase(phase, seconds, round = room.round) {
+  await clearActions();
+
+  await updateDoc(roomRef(), {
+    phase,
+    round,
+    endsAt: timestampAfter(seconds),
+    updatedAt: serverTimestamp()
+  });
+}
+
+async function finishGame(winner) {
+  await updateDoc(roomRef(), {
+    phase: "finished",
+    winner,
+    endsAt: null,
+    updatedAt: serverTimestamp()
+  });
+
+  await clearActions();
+  showNotice(winner === "Town" ? "The Town has won!" : "The Mafia has won!");
+}
+
+async function resolvePhase() {
+  if (!isHost() || !room || resolving) return;
+
+  const phase = room.phase;
+  const round = room.round;
+  const key = `${phase}-${round}`;
+
+  if (!["night", "discussion", "voting"].includes(phase)) return;
+
+  resolving = true;
+
+  try {
+    if (phase === "discussion") {
+      await beginPhase("voting", VOTING_SECONDS, round);
+      return;
+    }
+
+    if (phase === "night") {
+      const nightActions = currentActions("night");
+
+      const mafiaVotes = nightActions.filter(action =>
+        action.type === "kill" &&
+        privateByUid[action.uid]?.role === "Mafia" &&
+        players.some(player => player.id === action.targetUid && player.alive !== false)
+      );
+
+      const doctorActions = nightActions.filter(action =>
+        action.type === "protect" &&
+        privateByUid[action.uid]?.role === "Doctor"
+      );
+
+      const detectiveActions = nightActions.filter(action =>
+        action.type === "investigate" &&
+        privateByUid[action.uid]?.role === "Detective"
+      );
+
+      let killedUid = null;
+
+      if (mafiaVotes.length) {
+        const counts = {};
+
+        mafiaVotes.forEach(action => {
+          counts[action.targetUid] = (counts[action.targetUid] || 0) + 1;
+        });
+
+        const highest = Math.max(...Object.values(counts));
+        const topTargets = Object.keys(counts).filter(uid => counts[uid] === highest);
+
+        killedUid = topTargets[Math.floor(Math.random() * topTargets.length)];
+      }
+
+      const protectedUids = new Set(doctorActions.map(action => action.targetUid));
+
+      if (killedUid && !protectedUids.has(killedUid)) {
+        await revealEliminatedPlayer(killedUid);
+      }
+
+      for (const action of detectiveActions) {
+        const targetRole = privateByUid[action.targetUid]?.role;
+        const result = targetRole === "Mafia"
+          ? `${playerName(action.targetUid)} is Mafia.`
+          : `${playerName(action.targetUid)} is not Mafia.`;
+
+        await setDoc(privateRef(action.uid), {
+          ...privateByUid[action.uid],
+          investigationResult: result
+        });
+      }
+
+      const winner = await checkWinner();
+
+      if (winner) {
+        await finishGame(winner);
+        return;
+      }
+
+      await beginPhase("discussion", DISCUSSION_SECONDS, round);
+      return;
+    }
+
+    if (phase === "voting") {
+      const votes = currentActions("voting").filter(action =>
+        action.type === "vote" &&
+        players.some(player => player.id === action.uid && player.alive !== false) &&
+        players.some(player => player.id === action.targetUid && player.alive !== false)
+      );
+
+      const counts = {};
+
+      votes.forEach(action => {
+        counts[action.targetUid] = (counts[action.targetUid] || 0) + 1;
+      });
+
+      let eliminatedUid = null;
+
+      if (Object.keys(counts).length) {
+        const highest = Math.max(...Object.values(counts));
+        const topTargets = Object.keys(counts).filter(uid => counts[uid] === highest);
+
+        // A tied vote means nobody is eliminated.
+        if (topTargets.length === 1) {
+          eliminatedUid = topTargets[0];
+        }
+      }
+
+      if (eliminatedUid) {
+        await revealEliminatedPlayer(eliminatedUid);
+      }
+
+      const winner = await checkWinner();
+
+      if (winner) {
+        await finishGame(winner);
+        return;
+      }
+
+      await beginPhase("night", NIGHT_SECONDS, round + 1);
+    }
+  } catch (error) {
+    console.error("Game resolution failed:", key, error);
+    showNotice(`Couldn't advance the game: ${friendlyError(error)}`, true);
+  } finally {
+    resolving = false;
+  }
+}
+
+/* -------------------- LEAVING AND ROOM UTILITIES -------------------- */
+
+$("leave-room").addEventListener("click", async () => {
+  await leaveCurrentRoom(true);
+});
+
+async function leaveCurrentRoom(returnHome = true) {
+  if (!roomCode || !currentUser || leavingRoom) return;
+
+  leavingRoom = true;
+
+  const code = roomCode;
+  const uid = currentUser.uid;
+  const wasHost = room?.hostUid === uid;
+
+  try {
+    const remaining = players.filter(player => player.id !== uid);
+    const nextHost = remaining[0]?.id || null;
+
+    await runTransaction(db, async transaction => {
+      const ref = roomRef(code);
+      const snapshot = await transaction.get(ref);
+
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      const members = (data.memberUids || []).filter(memberUid => memberUid !== uid);
+
+      const update = {
+        memberUids: members,
+        updatedAt: serverTimestamp()
+      };
+
+      if (wasHost) {
+        update.hostUid = nextHost;
+      }
+
+      transaction.update(ref, update);
+    });
+
+    await Promise.all([
+      deleteDoc(playerRef(uid, code)).catch(() => {}),
+      deleteDoc(privateRef(uid, code)).catch(() => {}),
+      deleteDoc(actionRef(uid, code)).catch(() => {})
+    ]);
+
+    disconnectRoomListeners();
+
+    roomCode = null;
+    room = null;
+    players = [];
+    privateByUid = {};
+    actionsByUid = {};
+    myAction = null;
+
+    if (returnHome) {
+      showScreen("home");
+      showNotice("You left the room.");
+    }
+  } catch (error) {
+    showNotice(`Couldn't leave room: ${friendlyError(error)}`, true);
+  } finally {
+    leavingRoom = false;
+  }
+}
+
+$("copy-code").addEventListener("click", async () => {
+  if (!roomCode) return;
+
+  try {
+    await navigator.clipboard.writeText(roomCode);
+    showNotice(`Room code ${roomCode} copied!`);
+  } catch {
+    showNotice(`Your room code is ${roomCode}. Copy it manually.`);
   }
 });
