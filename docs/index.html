@@ -12,11 +12,14 @@
     <header class="topbar">
       <a class="brand" href="./">M<span>AF</span>IA</a>
       <span class="eyebrow">TRUST NO ONE</span>
-      <button id="signout" class="button subtle hidden">Sign out</button>
+      <button id="signout" class="button subtle hidden" type="button">
+        Sign out
+      </button>
     </header>
 
     <section id="notice" class="notice hidden" role="status"></section>
 
+    <!-- AUTHENTICATION -->
     <section id="auth-screen" class="panel auth-panel">
       <p class="eyebrow">A SOCIAL DEDUCTION GAME</p>
       <h1>Someone here<br>is lying.</h1>
@@ -24,58 +27,251 @@
 
       <form id="auth-form" class="stack">
         <label for="email">Email address</label>
-        <input id="email" type="email" autocomplete="email" required
-          placeholder="you@example.com">
+        <input
+          id="email"
+          type="email"
+          autocomplete="email"
+          required
+          placeholder="you@example.com"
+        >
 
         <label for="password">Password</label>
-        <input id="password" type="password"
-          autocomplete="current-password" minlength="6" required
-          placeholder="At least 6 characters">
+        <input
+          id="password"
+          type="password"
+          autocomplete="current-password"
+          minlength="6"
+          required
+          placeholder="At least 6 characters"
+        >
+
+        <!-- Shown when creating an account -->
+        <div id="signup-fields" class="stack hidden">
+          <div class="divider"></div>
+
+          <p class="eyebrow">CREATE YOUR PROFILE</p>
+
+          <label for="signup-name">Display name</label>
+          <input
+            id="signup-name"
+            type="text"
+            minlength="2"
+            maxlength="18"
+            autocomplete="nickname"
+            placeholder="What should people call you?"
+          >
+
+          <label for="signup-avatar">Profile picture (optional)</label>
+          <input
+            id="signup-avatar"
+            type="file"
+            accept="image/*"
+          >
+
+          <div
+            id="signup-avatar-preview"
+            class="profile-avatar large"
+            aria-label="Profile picture preview"
+          >?</div>
+
+          <p class="muted small">
+            Your image will be resized before being saved.
+          </p>
+        </div>
 
         <div class="button-row">
-          <button class="button primary" type="submit" id="signin">
+          <button
+            class="button primary"
+            type="submit"
+            id="signin"
+          >
             Sign in
           </button>
-          <button class="button" type="button" id="signup">
+
+          <button
+            class="button"
+            type="button"
+            id="signup"
+          >
             Create account
           </button>
         </div>
       </form>
     </section>
 
+    <!-- HOME -->
     <section id="home-screen" class="panel hidden">
+
+      <!-- PROFILE SUMMARY -->
+      <div class="profile-panel">
+        <div
+          id="profile-avatar"
+          class="profile-avatar"
+          aria-label="Your profile picture"
+        >?</div>
+
+        <div class="profile-summary">
+          <p class="eyebrow">YOUR PROFILE</p>
+          <h2 id="profile-display-name">Player</h2>
+          <p id="profile-email" class="muted small"></p>
+        </div>
+
+        <button
+          id="edit-profile-button"
+          class="button"
+          type="button"
+        >
+          Edit profile
+        </button>
+      </div>
+
+      <!-- PROFILE EDITOR -->
+      <div id="profile-editor" class="subpanel stack hidden">
+        <p class="eyebrow">ACCOUNT SETTINGS</p>
+        <h2>Edit your profile</h2>
+
+        <label for="edit-display-name">Display name</label>
+        <input
+          id="edit-display-name"
+          type="text"
+          minlength="2"
+          maxlength="18"
+          autocomplete="nickname"
+          required
+        >
+
+        <label for="edit-avatar">Change profile picture</label>
+        <input
+          id="edit-avatar"
+          type="file"
+          accept="image/*"
+        >
+
+        <div
+          id="edit-avatar-preview"
+          class="profile-avatar large"
+          aria-label="New profile picture preview"
+        >?</div>
+
+        <button
+          id="remove-avatar"
+          class="button subtle"
+          type="button"
+        >
+          Remove picture
+        </button>
+
+        <div class="divider"></div>
+
+        <label for="edit-email">Email address</label>
+        <input
+          id="edit-email"
+          type="email"
+          autocomplete="email"
+          required
+        >
+
+        <p class="muted small">
+          Changing your email or password requires your current
+          password. Leave the new password blank if you don't
+          want to change it.
+        </p>
+
+        <label for="current-password">Current password</label>
+        <input
+          id="current-password"
+          type="password"
+          autocomplete="current-password"
+        >
+
+        <label for="new-password">New password (optional)</label>
+        <input
+          id="new-password"
+          type="password"
+          minlength="6"
+          autocomplete="new-password"
+          placeholder="At least 6 characters"
+        >
+
+        <div class="button-row">
+          <button
+            id="save-profile"
+            class="button primary"
+            type="button"
+          >
+            Save changes
+          </button>
+
+          <button
+            id="cancel-profile"
+            class="button"
+            type="button"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+
       <p class="eyebrow">THE TOWN IS WAITING</p>
       <h1>Ready to play?</h1>
 
       <label for="player-name">Your player name</label>
-      <input id="player-name" maxlength="18" minlength="2"
-        placeholder="Choose a name">
+      <input
+        id="player-name"
+        maxlength="18"
+        minlength="2"
+        placeholder="Choose a name"
+      >
 
       <div class="split">
         <form id="create-form" class="subpanel stack">
           <h2>Create a room</h2>
-          <p class="muted">Become the host and invite your friends.</p>
-          <button class="button primary" type="submit">Create room</button>
+          <p class="muted">
+            Become the host and invite your friends.
+          </p>
+          <button class="button primary" type="submit">
+            Create room
+          </button>
         </form>
 
         <form id="join-form" class="subpanel stack">
           <h2>Join a room</h2>
-          <p class="muted">Enter the four-letter code from your host.</p>
+          <p class="muted">
+            Enter the four-letter code from your host.
+          </p>
+
           <label for="room-code">Room code</label>
-          <input id="room-code" maxlength="4" minlength="4"
-            pattern="[A-Za-z]{4}" placeholder="ABCD" required>
-          <button class="button" type="submit">Join room</button>
+          <input
+            id="room-code"
+            maxlength="4"
+            minlength="4"
+            pattern="[A-Za-z]{4}"
+            placeholder="ABCD"
+            required
+          >
+
+          <button class="button" type="submit">
+            Join room
+          </button>
         </form>
       </div>
     </section>
 
+    <!-- GAME -->
     <section id="game-screen" class="hidden">
       <div class="room-heading">
         <div>
           <p class="eyebrow">YOUR PRIVATE GAME</p>
           <h1>Room <span id="room-code-display">----</span></h1>
         </div>
-        <button id="copy-code" class="button">Copy code</button>
+
+        <button
+          id="copy-code"
+          class="button"
+          type="button"
+        >
+          Copy code
+        </button>
       </div>
 
       <div class="game-grid">
@@ -87,6 +283,7 @@
               <h2 id="phase-title">Waiting in lobby</h2>
             </div>
           </div>
+
           <p id="phase-description" class="muted">
             Waiting for players to join.
           </p>
@@ -109,11 +306,19 @@
             </label>
 
             <label id="reveal-setting" class="toggle-row hidden">
-              <input id="reveal-check" type="checkbox" checked>
+              <input
+                id="reveal-check"
+                type="checkbox"
+                checked
+              >
               <span>Reveal roles when players die</span>
             </label>
 
-            <button id="start-game" class="button primary hidden">
+            <button
+              id="start-game"
+              class="button primary hidden"
+              type="button"
+            >
               Start game
             </button>
           </div>
@@ -121,14 +326,41 @@
           <div id="action-controls" class="stack hidden">
             <label for="target-select">Choose a player</label>
             <select id="target-select"></select>
+
             <div id="night-buttons" class="button-row hidden">
-              <button data-action="kill" class="button danger">Choose victim</button>
-              <button data-action="investigate" class="button primary">Investigate</button>
-              <button data-action="protect" class="button">Protect</button>
+              <button
+                data-action="kill"
+                class="button danger"
+                type="button"
+              >
+                Choose victim
+              </button>
+
+              <button
+                data-action="investigate"
+                class="button primary"
+                type="button"
+              >
+                Investigate
+              </button>
+
+              <button
+                data-action="protect"
+                class="button"
+                type="button"
+              >
+                Protect
+              </button>
             </div>
-            <button id="submit-vote" class="button primary hidden">
+
+            <button
+              id="submit-vote"
+              class="button primary hidden"
+              type="button"
+            >
               Cast vote
             </button>
+
             <p id="action-status" class="muted"></p>
           </div>
 
@@ -138,17 +370,28 @@
             <p>The town's fate has been decided.</p>
           </div>
 
-          <button id="leave-room" class="button subtle">Leave room</button>
+          <button
+            id="leave-room"
+            class="button subtle"
+            type="button"
+          >
+            Leave room
+          </button>
         </section>
 
         <section class="panel">
           <div class="section-heading">
             <div>
               <p class="eyebrow">THE SUSPECTS</p>
-              <h2>Players <span id="player-count" class="muted">0/12</span></h2>
+              <h2>
+                Players
+                <span id="player-count" class="muted">0/12</span>
+              </h2>
             </div>
           </div>
+
           <div id="player-list" class="player-list"></div>
+
           <p class="muted small">
             Roles are private. Don't trust anyone too quickly.
           </p>
