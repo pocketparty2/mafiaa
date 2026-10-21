@@ -601,3 +601,50 @@ exports.advanceIfDue = onCall({ region: REGION }, async (request) => {
   const finalRoom = await readRoom(code);
   return { ok: true, phase: finalRoom.phase, winner: finalRoom.winner };
 });
+
+exports.leaveRoom = onCall({ region: REGION }, async (request) => {
+  const uid = requireAuth(request);
+  const code = cleanCode(request.data.code);
+  const ref = roomRef(code);
+
+  await db.runTransaction(async (tx) => {
+    const roomSnap = await tx.get(ref);
+    if (!roomSnap.exists) return;
+
+    const room = roomSnap.data();
+    if (!room.memberUids.includes(uid)) return;
+
+    const pRef = playerRef(code, uid);
+    const playerSnap = await tx.get(pRef);
+    if (!playerSnap.exists) return;
+
+    if (room.phase !== "lobby") {
+      // During a game, preserve membership for private-state access,
+      // but mark the departing player as eliminated.
+      tx.update(pRef, { alive: false });
+      return;
+    }
+
+    const remaining = room.memberUids.filter(id => id !== uid);
+
+    if (remaining.length === 0) {
+      tx.delete(pRef);
+      tx.delete(ref);
+      return;
+    }
+
+    const update = {
+      memberUids: remaining,
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    if (room.hostUid === uid) {
+      update.hostUid = remaining[0];
+    }
+
+    tx.update(ref, update);
+    tx.delete(pRef);
+  });
+
+  return { ok: true };
+});
