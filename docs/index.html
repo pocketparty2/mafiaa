@@ -1,14 +1,16 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#11131c">
-  <title>MAFIA — Trust No One</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#11111A">
+  <title>MAFIA</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <main class="shell">
+
     <header class="topbar">
       <a class="brand" href="./">M<span>AF</span>IA</a>
       <span class="eyebrow">TRUST NO ONE</span>
@@ -21,18 +23,17 @@
 
     <!-- AUTHENTICATION -->
     <section id="auth-screen" class="panel auth-panel">
-      <p class="eyebrow">A SOCIAL DEDUCTION GAME</p>
-      <h1>Someone here<br>is lying.</h1>
-      <p class="muted">Make alliances. Read the room. Find the Mafia.</p>
+      <p class="eyebrow">MAFIA</p>
+      <h1>Trust no one.</h1>
 
       <form id="auth-form" class="stack">
-        <label for="email">Email address</label>
+        <label for="email">Email</label>
         <input
           id="email"
           type="email"
           autocomplete="email"
           required
-          placeholder="you@example.com"
+          placeholder="Email address"
         >
 
         <label for="password">Password</label>
@@ -42,14 +43,13 @@
           autocomplete="current-password"
           minlength="6"
           required
-          placeholder="At least 6 characters"
+          placeholder="Password"
         >
 
-        <!-- Shown when creating an account -->
         <div id="signup-fields" class="stack hidden">
           <div class="divider"></div>
 
-          <p class="eyebrow">CREATE YOUR PROFILE</p>
+          <p class="eyebrow">CREATE PROFILE</p>
 
           <label for="signup-name">Display name</label>
           <input
@@ -58,10 +58,10 @@
             minlength="2"
             maxlength="18"
             autocomplete="nickname"
-            placeholder="What should people call you?"
+            placeholder="Display name"
           >
 
-          <label for="signup-avatar">Profile picture (optional)</label>
+          <label for="signup-avatar">Profile picture</label>
           <input
             id="signup-avatar"
             type="file"
@@ -73,26 +73,14 @@
             class="profile-avatar large"
             aria-label="Profile picture preview"
           >?</div>
-
-          <p class="muted small">
-            Your image will be resized before being saved.
-          </p>
         </div>
 
         <div class="button-row">
-          <button
-            class="button primary"
-            type="submit"
-            id="signin"
-          >
+          <button class="button primary" type="submit" id="signin">
             Sign in
           </button>
 
-          <button
-            class="button"
-            type="button"
-            id="signup"
-          >
+          <button class="button" type="button" id="signup">
             Create account
           </button>
         </div>
@@ -102,7 +90,6 @@
     <!-- HOME -->
     <section id="home-screen" class="panel hidden">
 
-      <!-- PROFILE SUMMARY -->
       <div class="profile-panel">
         <div
           id="profile-avatar"
@@ -111,7 +98,7 @@
         >?</div>
 
         <div class="profile-summary">
-          <p class="eyebrow">YOUR PROFILE</p>
+          <p class="eyebrow">PROFILE</p>
           <h2 id="profile-display-name">Player</h2>
           <p id="profile-email" class="muted small"></p>
         </div>
@@ -121,14 +108,13 @@
           class="button"
           type="button"
         >
-          Edit profile
+          Edit
         </button>
       </div>
 
       <!-- PROFILE EDITOR -->
       <div id="profile-editor" class="subpanel stack hidden">
-        <p class="eyebrow">ACCOUNT SETTINGS</p>
-        <h2>Edit your profile</h2>
+        <p class="eyebrow">PROFILE SETTINGS</p>
 
         <label for="edit-display-name">Display name</label>
         <input
@@ -140,7 +126,7 @@
           required
         >
 
-        <label for="edit-avatar">Change profile picture</label>
+        <label for="edit-avatar">Profile picture</label>
         <input
           id="edit-avatar"
           type="file"
@@ -163,19 +149,13 @@
 
         <div class="divider"></div>
 
-        <label for="edit-email">Email address</label>
+        <label for="edit-email">Email</label>
         <input
           id="edit-email"
           type="email"
           autocomplete="email"
           required
         >
-
-        <p class="muted small">
-          Changing your email or password requires your current
-          password. Leave the new password blank if you don't
-          want to change it.
-        </p>
 
         <label for="current-password">Current password</label>
         <input
@@ -190,7 +170,7 @@
           type="password"
           minlength="6"
           autocomplete="new-password"
-          placeholder="At least 6 characters"
+          placeholder="New password"
         >
 
         <div class="button-row">
@@ -199,7 +179,7 @@
             class="button primary"
             type="button"
           >
-            Save changes
+            Save
           </button>
 
           <button
@@ -218,9 +198,7 @@
       <div class="split">
         <form id="create-form" class="subpanel stack">
           <h2>Create a room</h2>
-          <p class="muted">
-            Become the host and invite your friends.
-          </p>
+
           <button class="button primary" type="submit">
             Create room
           </button>
@@ -228,9 +206,6 @@
 
         <form id="join-form" class="subpanel stack">
           <h2>Join a room</h2>
-          <p class="muted">
-            Enter the four-letter code from your host.
-          </p>
 
           <label for="room-code">Room code</label>
           <input
@@ -251,40 +226,39 @@
 
     <!-- GAME -->
     <section id="game-screen" class="hidden">
+
       <div class="room-heading">
         <div>
-          <p class="eyebrow">YOUR PRIVATE GAME</p>
+          <p class="eyebrow">GAME ROOM</p>
           <h1>Room <span id="room-code-display">----</span></h1>
         </div>
 
-        <button
-          id="copy-code"
-          class="button"
-          type="button"
-        >
+        <button id="copy-code" class="button" type="button">
           Copy code
         </button>
       </div>
 
       <div class="game-grid">
+
+        <!-- GAME STATUS AND ACTIONS -->
         <section class="panel">
           <div class="phase-heading">
             <span id="phase-dot" class="phase-dot"></span>
             <div>
-              <p class="eyebrow">CURRENT PHASE</p>
+              <p class="eyebrow">PHASE</p>
               <h2 id="phase-title">Waiting in lobby</h2>
             </div>
           </div>
 
           <p id="phase-description" class="muted">
-            Waiting for players to join.
+            Waiting for players.
           </p>
 
           <div id="timer" class="timer">--:--</div>
           <p id="round-label" class="muted">Lobby</p>
 
           <div id="role-card" class="role-card hidden">
-            <p class="eyebrow">YOUR SECRET ROLE</p>
+            <p class="eyebrow">YOUR ROLE</p>
             <h2 id="role-name">Unknown</h2>
             <p id="role-description"></p>
             <p id="investigation-result" class="muted"></p>
@@ -294,16 +268,12 @@
           <div id="lobby-controls" class="stack">
             <label class="toggle-row">
               <input id="ready-check" type="checkbox">
-              <span>I'm ready to play</span>
+              <span>Ready to play</span>
             </label>
 
             <label id="reveal-setting" class="toggle-row hidden">
-              <input
-                id="reveal-check"
-                type="checkbox"
-                checked
-              >
-              <span>Reveal roles when players die</span>
+              <input id="reveal-check" type="checkbox" checked>
+              <span>Reveal roles on death</span>
             </label>
 
             <button
@@ -359,7 +329,7 @@
           <div id="finished-card" class="role-card hidden">
             <p class="eyebrow">GAME OVER</p>
             <h2 id="winner-text"></h2>
-            <p>The town's fate has been decided.</p>
+            <p>The game has ended.</p>
           </div>
 
           <button
@@ -371,6 +341,7 @@
           </button>
         </section>
 
+        <!-- PLAYER LIST -->
         <section class="panel">
           <div class="section-heading">
             <div>
@@ -383,15 +354,13 @@
           </div>
 
           <div id="player-list" class="player-list"></div>
-
-          <p class="muted small">
-            Roles are private. Don't trust anyone too quickly.
-          </p>
         </section>
+
       </div>
     </section>
 
-    <footer>MAFIA <span>•</span> A GAME OF SECRETS</footer>
+    <footer>MAFIA <span>•</span> TRUST NO ONE</footer>
+
   </main>
 
   <script type="module" src="./app.js"></script>
