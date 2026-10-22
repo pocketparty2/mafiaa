@@ -841,3 +841,56 @@ button {
     display: none;
   }
 }
+
+.profile-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.profile-panel #profile-display-name {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.edit-profile-small {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.profile-avatar {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+@media (max-width: 400px) {
+  .profile-panel {
+    gap: 9px;
+  }
+
+  .profile-avatar {
+    flex-basis: 42px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .edit-profile-small {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+}
