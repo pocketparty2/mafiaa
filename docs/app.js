@@ -1,3 +1,4 @@
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {
   getAuth,
@@ -59,6 +60,7 @@ let players = [];
 let privateByUid = {};
 let actionsByUid = {};
 let myAction = null;
+let activeLobbyTab = "settings";
 
 let unsubRoom = null;
 let unsubPlayers = null;
@@ -66,13 +68,18 @@ let unsubPrivate = null;
 let unsubActions = null;
 let unsubMyPrivate = null;
 let unsubMyAction = null;
+let hostListenersCode = null;
 
 let timerHandle = null;
 let resolving = false;
 let leavingRoom = false;
 
+/* -------------------- GENERAL UTILITIES -------------------- */
+
 function showNotice(message, isError = false) {
   const el = $("notice");
+  if (!el) return;
+
   el.textContent = message;
   el.classList.remove("hidden");
   el.classList.toggle("error", isError);
@@ -207,17 +214,6 @@ function formatTime(seconds) {
   return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
-function phaseDuration(phase) {
-  if (phase === "night") return NIGHT_SECONDS;
-  if (phase === "discussion") return DISCUSSION_SECONDS;
-  if (phase === "voting") return VOTING_SECONDS;
-  return 0;
-}
-
-function escapeText(value) {
-  return String(value ?? "");
-}
-
 /* -------------------- PROFILE IMAGES -------------------- */
 
 async function resizeImage(file) {
@@ -280,12 +276,13 @@ function renderAvatar(element, data, name = "") {
 function renderProfile() {
   const name = getDisplayName();
 
-  $("profile-display-name").textContent = name;
-  $("profile-email").textContent = currentUser?.email || "";
-  
-  $("change-password-button").addEventListener("click", () => {
-    $("password-fields").classList.toggle("hidden");
-  });
+  if ($("profile-display-name")) {
+    $("profile-display-name").textContent = name;
+  }
+
+  if ($("profile-email")) {
+    $("profile-email").textContent = currentUser?.email || "";
+  }
 
   renderAvatar($("profile-avatar"), profile.avatarData, name);
 
@@ -298,7 +295,11 @@ function renderProfile() {
   }
 
   if ($("edit-avatar-preview")) {
-    renderAvatar($("edit-avatar-preview"), pendingEditAvatar ?? profile.avatarData, name);
+    renderAvatar(
+      $("edit-avatar-preview"),
+      pendingEditAvatar ?? profile.avatarData,
+      name
+    );
   }
 
   if ($("signup-avatar-preview")) {
@@ -352,7 +353,11 @@ $("signup-avatar").addEventListener("change", async event => {
 
   try {
     pendingSignupAvatar = await resizeImage(file);
-    renderAvatar($("signup-avatar-preview"), pendingSignupAvatar, $("signup-name").value);
+    renderAvatar(
+      $("signup-avatar-preview"),
+      pendingSignupAvatar,
+      $("signup-name").value
+    );
   } catch (error) {
     showNotice(friendlyError(error), true);
     event.target.value = "";
@@ -421,6 +426,7 @@ onAuthStateChanged(auth, async user => {
     players = [];
     privateByUid = {};
     actionsByUid = {};
+    myAction = null;
     profile = { displayName: "", avatarData: "" };
     showScreen("auth");
     return;
@@ -457,6 +463,8 @@ $("edit-profile-button").addEventListener("click", () => {
   $("new-password").value = "";
   $("edit-avatar").value = "";
 
+  setVisible("password-fields", false);
+
   renderAvatar(
     $("edit-avatar-preview"),
     profile.avatarData,
@@ -466,9 +474,23 @@ $("edit-profile-button").addEventListener("click", () => {
   setVisible("profile-editor", true);
 });
 
+$("change-password-button").addEventListener("click", () => {
+  const fields = $("password-fields");
+  if (!fields) return;
+
+  const opening = fields.classList.contains("hidden");
+  setVisible("password-fields", opening);
+
+  if (!opening) {
+    $("current-password").value = "";
+    $("new-password").value = "";
+  }
+});
+
 $("cancel-profile").addEventListener("click", () => {
   pendingEditAvatar = null;
   setVisible("profile-editor", false);
+  setVisible("password-fields", false);
   renderProfile();
 });
 
@@ -558,6 +580,7 @@ $("save-profile").addEventListener("click", async () => {
 
     renderProfile();
     setVisible("profile-editor", false);
+    setVisible("password-fields", false);
     showNotice("Profile updated!");
   } catch (error) {
     showNotice(friendlyError(error), true);
@@ -628,7 +651,6 @@ $("create-form").addEventListener("submit", async event => {
       joinedAt: serverTimestamp()
     });
 
-    roomCode = createdCode;
     connectToRoom(createdCode);
     showNotice(`Room ${createdCode} created! Share the code with your friends.`);
   } catch (error) {
@@ -638,7 +660,6 @@ $("create-form").addEventListener("submit", async event => {
     button.disabled = false;
   }
 });
-
 
 $("join-form").addEventListener("submit", async event => {
   event.preventDefault();
@@ -655,14 +676,12 @@ $("join-form").addEventListener("submit", async event => {
     return;
   }
 
-  const form = $("join-form");
-  const button = form.querySelector('button[type="submit"]');
+  const button = $("join-form").querySelector('button[type="submit"]');
 
   try {
     button.disabled = true;
 
     const ref = roomRef(code);
-    console.log("JOIN STEP 1: Reading room");
     const snapshot = await getDoc(ref);
 
     if (!snapshot.exists()) {
@@ -682,14 +701,12 @@ $("join-form").addEventListener("submit", async event => {
     }
 
     if (!alreadyMember) {
-      console.log("JOIN STEP 2: Updating membership");
       await updateDoc(ref, {
         memberUids: arrayUnion(currentUser.uid),
         updatedAt: serverTimestamp()
       });
     }
 
-    console.log("JOIN STEP 2: Updating membership");
     await setDoc(playerRef(currentUser.uid, code), {
       uid: currentUser.uid,
       name: getDisplayName(),
@@ -700,17 +717,11 @@ $("join-form").addEventListener("submit", async event => {
       joinedAt: serverTimestamp()
     });
 
-    roomCode = code;
     connectToRoom(code);
     showNotice(`Joined room ${code}!`);
-
   } catch (error) {
     console.error("Join room failed:", error);
-
-    showNotice(
-      `Couldn't join room: ${friendlyError(error)}`,
-      true
-    );
+    showNotice(`Couldn't join room: ${friendlyError(error)}`, true);
   } finally {
     button.disabled = false;
   }
@@ -732,6 +743,7 @@ function disconnectRoomListeners() {
   unsubActions = null;
   unsubMyPrivate = null;
   unsubMyAction = null;
+  hostListenersCode = null;
 
   if (timerHandle) {
     clearInterval(timerHandle);
@@ -750,6 +762,7 @@ function connectToRoom(code) {
   myAction = null;
   resolving = false;
   leavingRoom = false;
+  activeLobbyTab = "settings";
 
   $("room-code-display").textContent = code;
   $("room-code").value = "";
@@ -762,6 +775,7 @@ function connectToRoom(code) {
       disconnectRoomListeners();
       roomCode = null;
       room = null;
+      players = [];
       showScreen("home");
       return;
     }
@@ -773,8 +787,23 @@ function connectToRoom(code) {
       disconnectRoomListeners();
       roomCode = null;
       room = null;
+      players = [];
       showScreen("home");
       return;
+    }
+
+    // Attach host-only listeners after the room document has loaded.
+    if (isHost() && hostListenersCode !== code) {
+      attachHostListeners(code);
+      hostListenersCode = code;
+    } else if (!isHost() && hostListenersCode === code) {
+      unsubPrivate?.();
+      unsubActions?.();
+      unsubPrivate = null;
+      unsubActions = null;
+      hostListenersCode = null;
+      privateByUid = {};
+      actionsByUid = {};
     }
 
     renderGame();
@@ -803,12 +832,14 @@ function connectToRoom(code) {
 
   if (currentUser) {
     unsubMyPrivate = onSnapshot(privateRef(currentUser.uid, code), snapshot => {
+      // Hosts receive the full collection through attachHostListeners.
       if (!isHost()) {
         if (snapshot.exists()) {
           privateByUid[currentUser.uid] = snapshot.data();
         } else {
           delete privateByUid[currentUser.uid];
         }
+
         renderGame();
       }
     }, error => {
@@ -823,13 +854,8 @@ function connectToRoom(code) {
     });
   }
 
-  // Only the host reads the full private-role and action collections.
-  // Other players can read only their own private role and action.
-  if (room?.hostUid === currentUser?.uid) {
-    attachHostListeners(code);
-  }
-
   if (timerHandle) clearInterval(timerHandle);
+
   timerHandle = setInterval(() => {
     renderTimer();
     maybeResolvePhase();
@@ -867,18 +893,46 @@ function attachHostListeners(code) {
   });
 }
 
-/* -------------------- GAME RENDERING -------------------- */
+/* -------------------- GAME AND LOBBY RENDERING -------------------- */
 
 function renderGame() {
   if (!room || !currentUser) return;
 
   $("room-code-display").textContent = roomCode || "----";
-  $("player-count").textContent = `${players.length}/${MAX_PLAYERS}`;
 
   const phase = room.phase || "lobby";
   const host = isHost();
   const self = me();
   const role = myRole();
+  const inLobby = phase === "lobby";
+
+  // Lobby and active-game layouts are separate.
+  setVisible("lobby-layout", inLobby);
+  setVisible("game-grid", !inLobby);
+
+  // Only the host gets tabs.
+  setVisible("lobby-tabs", inLobby && host);
+
+  // The host starts on Settings and can switch to Players.
+  setVisible(
+    "lobby-settings-panel",
+    inLobby && host && activeLobbyTab === "settings"
+  );
+
+  // Non-hosts always see the player list.
+  setVisible(
+    "lobby-players-panel",
+    inLobby && (!host || activeLobbyTab === "players")
+  );
+
+  document.querySelectorAll("[data-lobby-tab]").forEach(button => {
+    const active = button.dataset.lobbyTab === activeLobbyTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+
+  $("lobby-player-count").textContent = `${players.length}/${MAX_PLAYERS}`;
+  $("player-count").textContent = `${players.length}/${MAX_PLAYERS}`;
 
   $("phase-dot").className = `phase-dot phase-${phase}`;
 
@@ -908,20 +962,23 @@ function renderGame() {
       ? `Final round: ${room.round || 1}`
       : `Round ${room.round || 1}`;
 
-  setVisible("lobby-controls", phase === "lobby");
+  setVisible("lobby-controls", inLobby);
   setVisible("action-controls", phase === "night" || phase === "voting");
   setVisible("finished-card", phase === "finished");
-  setVisible("role-card", Boolean(role) && phase !== "lobby");
+  setVisible("role-card", Boolean(role) && !inLobby);
 
+  // Ready status is available to all lobby members.
   $("ready-check").checked = Boolean(self?.ready);
-  $("ready-check").disabled = phase !== "lobby";
+  $("ready-check").disabled = !inLobby;
 
-  setVisible("reveal-setting", phase === "lobby" && host);
+  // Reveal settings and Start Game are host-only.
+  setVisible("reveal-setting", inLobby && host);
   $("reveal-check").checked = room.settings?.revealRoles !== false;
-  $("reveal-check").disabled = !host || phase !== "lobby";
+  $("reveal-check").disabled = !host || !inLobby;
 
-  setVisible("start-game", phase === "lobby" && host);
+  setVisible("start-game", inLobby && host);
   $("start-game").disabled =
+    !host ||
     players.length < MIN_PLAYERS ||
     players.length > MAX_PLAYERS ||
     !players.every(player => player.ready);
@@ -953,11 +1010,16 @@ function renderGame() {
     const investigation = privateByUid[currentUser.uid]?.investigationResult;
     $("investigation-result").textContent = investigation || "";
 
-    if (role === "Mafia" && privateByUid[currentUser.uid]?.mafiaTeammates?.length) {
+    if (
+      role === "Mafia" &&
+      privateByUid[currentUser.uid]?.mafiaTeammates?.length
+    ) {
       const names = privateByUid[currentUser.uid].mafiaTeammates
         .map(uid => playerName(uid))
         .join(", ");
-      $("team-info").textContent = `Your fellow Mafia: ${names}. You win when the Mafia equal or outnumber the Town.`;
+
+      $("team-info").textContent =
+        `Your fellow Mafia: ${names}. You win when the Mafia equal or outnumber the Town.`;
     }
   } else {
     $("role-name").textContent = "Not assigned yet";
@@ -983,53 +1045,88 @@ function renderGame() {
 }
 
 function renderPlayers() {
-  const container = $("player-list");
-  container.replaceChildren();
+  // The lobby and active game each have their own player-list container.
+  const containers = [
+    $("lobby-player-list"),
+    $("player-list")
+  ].filter(Boolean);
 
-  players.forEach(player => {
-    const row = document.createElement("div");
-    row.className = "player-row";
+  containers.forEach(container => {
+    container.replaceChildren();
 
-    if (player.id === currentUser?.uid) row.classList.add("is-you");
-    if (player.alive === false) row.classList.add("is-dead");
+    players.forEach(player => {
+      const isYou = player.id === currentUser?.uid;
+      const isReady = room?.phase === "lobby" && Boolean(player.ready);
+      const isDead = player.alive === false;
 
-    const avatar = document.createElement("div");
-    avatar.className = "profile-avatar player-avatar";
-    renderAvatar(avatar, player.avatarData || "", player.name || "Player");
+      const card = document.createElement("div");
+      card.className = "player-card";
 
-    const info = document.createElement("div");
-    info.className = "player-info";
+      if (isYou) card.classList.add("is-you");
+      if (isReady) card.classList.add("is-ready");
+      if (isDead) card.classList.add("is-dead");
 
-    const name = document.createElement("strong");
-    name.textContent = escapeText(player.name || "Player");
+      const avatarWrap = document.createElement("div");
+      avatarWrap.className = "player-card-avatar-wrap";
 
-    const meta = document.createElement("span");
-    meta.className = "muted small";
+      const avatar = document.createElement("div");
+      avatar.className = "profile-avatar player-card-avatar";
 
-    const tags = [];
-    if (player.id === room?.hostUid) tags.push("Host");
-    if (player.id === currentUser?.uid) tags.push("You");
-    if (player.alive === false) tags.push("Eliminated");
-    else if (room?.phase === "lobby") tags.push(player.ready ? "Ready" : "Not ready");
+      renderAvatar(
+        avatar,
+        player.avatarData || "",
+        player.name || "Player"
+      );
 
-    meta.textContent = tags.join(" · ");
-    info.append(name, meta);
+      avatarWrap.append(avatar);
 
-    row.append(avatar, info);
+      if (isReady) {
+        const check = document.createElement("span");
+        check.className = "player-ready-check";
+        check.textContent = "✓";
+        check.setAttribute("aria-label", "Ready");
+        check.title = "Ready";
+        avatarWrap.append(check);
+      }
 
-    if (player.alive === false && room?.settings?.revealRoles !== false && player.roleReveal) {
-      const badge = document.createElement("span");
-      badge.className = "role-badge";
-      badge.textContent = player.roleReveal;
-      row.append(badge);
-    }
+      const name = document.createElement("strong");
+      name.className = "player-card-name";
+      name.textContent = `${player.name || "Player"}${isYou ? " (You)" : ""}`;
 
-    container.append(row);
+      card.append(avatarWrap, name);
+
+      if (isDead) {
+        const status = document.createElement("span");
+        status.className = "player-card-status";
+        status.textContent = "Eliminated";
+        card.append(status);
+      } else if (room?.phase === "lobby") {
+        const status = document.createElement("span");
+        status.className = "player-card-status";
+        status.textContent = isReady ? "Ready" : "Not ready";
+        card.append(status);
+      }
+
+      if (
+        isDead &&
+        room?.settings?.revealRoles !== false &&
+        player.roleReveal
+      ) {
+        const badge = document.createElement("span");
+        badge.className = "role-badge";
+        badge.textContent = player.roleReveal;
+        card.append(badge);
+      }
+
+      container.append(card);
+    });
   });
 }
 
 function renderTargetOptions() {
   const select = $("target-select");
+  if (!select) return;
+
   const previous = select.value;
   select.replaceChildren();
 
@@ -1078,6 +1175,7 @@ function renderActionControls() {
   const role = myRole();
   const self = me();
   const alive = self?.alive !== false;
+
   const currentAction = myAction &&
     myAction.phase === phase &&
     myAction.round === room?.round
@@ -1093,6 +1191,7 @@ function renderActionControls() {
 
   $("night-buttons").querySelectorAll("button").forEach(button => {
     const actionType = button.dataset.action;
+
     const allowed = (
       (role === "Mafia" && actionType === "kill") ||
       (role === "Doctor" && actionType === "protect") ||
@@ -1103,7 +1202,9 @@ function renderActionControls() {
     button.disabled = Boolean(currentAction) || !allowed;
   });
 
-  $("submit-vote").disabled = Boolean(currentAction) || phase !== "voting" || !alive;
+  $("submit-vote").disabled =
+    Boolean(currentAction) || phase !== "voting" || !alive;
+
   $("target-select").disabled =
     (!nightEligible && phase !== "voting") || Boolean(currentAction);
 
@@ -1112,7 +1213,8 @@ function renderActionControls() {
       ? "Your vote has been submitted."
       : "Your night action has been submitted.";
   } else if (!alive && phase !== "lobby" && phase !== "finished") {
-    $("action-status").textContent = "You've been eliminated. You can watch, but you can't act.";
+    $("action-status").textContent =
+      "You've been eliminated. You can watch, but you can't act.";
   } else if (phase === "night" && !nightEligible) {
     $("action-status").textContent = "Your role has no action tonight.";
   } else {
@@ -1129,10 +1231,33 @@ function renderTimer() {
   $("timer").textContent = formatTime(secondsUntil(room.endsAt));
 }
 
-/* -------------------- LOBBY ACTIONS -------------------- */
+/* -------------------- LOBBY TABS AND ACTIONS -------------------- */
+
+document.querySelectorAll("[data-lobby-tab]").forEach(button => {
+  button.addEventListener("click", () => {
+    if (!isHost() || room?.phase !== "lobby") return;
+
+    const tab = button.dataset.lobbyTab;
+    if (!["settings", "players"].includes(tab)) return;
+
+    activeLobbyTab = tab;
+    renderGame();
+  });
+});
+
+$("room-code-copy").addEventListener("click", async () => {
+  if (!roomCode) return;
+
+  try {
+    await navigator.clipboard.writeText(roomCode);
+    showNotice(`Room code ${roomCode} copied!`);
+  } catch {
+    showNotice(`Your room code is ${roomCode}. Copy it manually.`);
+  }
+});
 
 $("ready-check").addEventListener("change", async event => {
-  if (!roomCode || room?.phase !== "lobby") return;
+  if (!roomCode || room?.phase !== "lobby" || !currentUser) return;
 
   try {
     await updateDoc(playerRef(currentUser.uid), {
@@ -1140,6 +1265,7 @@ $("ready-check").addEventListener("change", async event => {
     });
   } catch (error) {
     showNotice(friendlyError(error), true);
+    event.target.checked = Boolean(me()?.ready);
   }
 });
 
@@ -1156,6 +1282,7 @@ $("reveal-check").addEventListener("change", async event => {
     });
   } catch (error) {
     showNotice(friendlyError(error), true);
+    event.target.checked = room.settings?.revealRoles !== false;
   }
 });
 
@@ -1181,6 +1308,7 @@ async function startGame() {
     const mafiaCount = Math.max(1, Math.floor(players.length / 4));
 
     const roleAssignments = new Map();
+
     shuffledPlayers.forEach((player, index) => {
       if (index < mafiaCount) roleAssignments.set(player.id, "Mafia");
       else if (index === mafiaCount) roleAssignments.set(player.id, "Detective");
@@ -1326,6 +1454,7 @@ function currentActions(phase) {
 
 function hasSubmitted(uid, phase) {
   const action = actionsByUid[uid];
+
   return Boolean(
     action &&
     action.phase === phase &&
@@ -1347,12 +1476,14 @@ function allRequiredActionsSubmitted() {
 
   if (room.phase === "night") {
     const actors = requiredNightActors();
+
     return actors.length > 0 &&
       actors.every(player => hasSubmitted(player.id, "night"));
   }
 
   if (room.phase === "voting") {
     const voters = alivePlayers();
+
     return voters.length > 0 &&
       voters.every(player => hasSubmitted(player.id, "voting"));
   }
@@ -1361,7 +1492,13 @@ function allRequiredActionsSubmitted() {
 }
 
 function maybeResolvePhase() {
-  if (!room || !isHost() || resolving || room.phase === "finished" || room.phase === "lobby") {
+  if (
+    !room ||
+    !isHost() ||
+    resolving ||
+    room.phase === "finished" ||
+    room.phase === "lobby"
+  ) {
     return;
   }
 
@@ -1458,7 +1595,9 @@ async function resolvePhase() {
       const mafiaVotes = nightActions.filter(action =>
         action.type === "kill" &&
         privateByUid[action.uid]?.role === "Mafia" &&
-        players.some(player => player.id === action.targetUid && player.alive !== false)
+        players.some(player =>
+          player.id === action.targetUid && player.alive !== false
+        )
       );
 
       const doctorActions = nightActions.filter(action =>
@@ -1481,12 +1620,16 @@ async function resolvePhase() {
         });
 
         const highest = Math.max(...Object.values(counts));
-        const topTargets = Object.keys(counts).filter(uid => counts[uid] === highest);
+        const topTargets = Object.keys(counts).filter(
+          uid => counts[uid] === highest
+        );
 
         killedUid = topTargets[Math.floor(Math.random() * topTargets.length)];
       }
 
-      const protectedUids = new Set(doctorActions.map(action => action.targetUid));
+      const protectedUids = new Set(
+        doctorActions.map(action => action.targetUid)
+      );
 
       if (killedUid && !protectedUids.has(killedUid)) {
         await revealEliminatedPlayer(killedUid);
@@ -1518,8 +1661,12 @@ async function resolvePhase() {
     if (phase === "voting") {
       const votes = currentActions("voting").filter(action =>
         action.type === "vote" &&
-        players.some(player => player.id === action.uid && player.alive !== false) &&
-        players.some(player => player.id === action.targetUid && player.alive !== false)
+        players.some(player =>
+          player.id === action.uid && player.alive !== false
+        ) &&
+        players.some(player =>
+          player.id === action.targetUid && player.alive !== false
+        )
       );
 
       const counts = {};
@@ -1532,7 +1679,9 @@ async function resolvePhase() {
 
       if (Object.keys(counts).length) {
         const highest = Math.max(...Object.values(counts));
-        const topTargets = Object.keys(counts).filter(uid => counts[uid] === highest);
+        const topTargets = Object.keys(counts).filter(
+          uid => counts[uid] === highest
+        );
 
         // A tied vote means nobody is eliminated.
         if (topTargets.length === 1) {
@@ -1561,7 +1710,7 @@ async function resolvePhase() {
   }
 }
 
-/* -------------------- LEAVING AND ROOM UTILITIES -------------------- */
+/* -------------------- LEAVING THE ROOM -------------------- */
 
 $("leave-room").addEventListener("click", async () => {
   await leaveCurrentRoom(true);
@@ -1587,7 +1736,9 @@ async function leaveCurrentRoom(returnHome = true) {
       if (!snapshot.exists()) return;
 
       const data = snapshot.data();
-      const members = (data.memberUids || []).filter(memberUid => memberUid !== uid);
+      const members = (data.memberUids || []).filter(
+        memberUid => memberUid !== uid
+      );
 
       const update = {
         memberUids: members,
@@ -1626,14 +1777,3 @@ async function leaveCurrentRoom(returnHome = true) {
     leavingRoom = false;
   }
 }
-
-$("copy-code").addEventListener("click", async () => {
-  if (!roomCode) return;
-
-  try {
-    await navigator.clipboard.writeText(roomCode);
-    showNotice(`Room code ${roomCode} copied!`);
-  } catch {
-    showNotice(`Your room code is ${roomCode}. Copy it manually.`);
-  }
-});
