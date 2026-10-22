@@ -1,4 +1,3 @@
-
 :root {
   color-scheme: dark;
   --bg: #11111A;
@@ -892,5 +891,89 @@ button {
   .edit-profile-small {
     padding: 5px 8px;
     font-size: 11px;
+  }
+}
+
+/* Compact profile settings */
+.profile-fields-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.compact-field {
+  gap: 6px;
+  min-width: 0;
+}
+
+.compact-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.password-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+#password-fields {
+  width: 100%;
+}
+
+.profile-picture-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  padding-top: 4px;
+}
+
+.profile-picture-preview-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-picture-preview-column > label {
+  align-self: flex-start;
+}
+
+.profile-picture-preview-column .profile-avatar {
+  width: 88px;
+  height: 88px;
+}
+
+.profile-picture-actions {
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.profile-picture-actions input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+}
+
+@media (max-width: 400px) {
+  .profile-fields-row {
+    gap: 8px;
+  }
+
+  .profile-fields-row label {
+    font-size: 12px;
+  }
+
+  .profile-picture-row {
+    gap: 14px;
+  }
+
+  .profile-picture-preview-column .profile-avatar {
+    width: 72px;
+    height: 72px;
   }
 }
