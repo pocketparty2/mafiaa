@@ -109,66 +109,91 @@
         </button>
       </div>
 
+      
       <!-- PROFILE EDITOR -->
       <div id="profile-editor" class="subpanel stack hidden">
         <p class="eyebrow">PROFILE SETTINGS</p>
 
-        <label for="edit-display-name">Display name</label>
-        <input
-          id="edit-display-name"
-          type="text"
-          minlength="2"
-          maxlength="18"
-          autocomplete="nickname"
-          required
-        >
+        <div class="profile-fields-row">
+          <div class="stack compact-field">
+            <label for="edit-display-name">Display name</label>
+            <input
+              id="edit-display-name"
+              type="text"
+              minlength="2"
+              maxlength="18"
+              autocomplete="nickname"
+              required
+            >
+          </div>
 
-        <label for="edit-avatar">Profile picture</label>
-        <input
-          id="edit-avatar"
-          type="file"
-          accept="image/*"
-        >
+          <div class="stack compact-field">
+            <label for="edit-email">Email</label>
+            <input
+              id="edit-email"
+              type="email"
+              autocomplete="email"
+              required
+            >
+          </div>
+        </div>
 
-        <div
-          id="edit-avatar-preview"
-          class="profile-avatar large"
-          aria-label="New profile picture preview"
-        >?</div>
+        <div class="password-section">
+          <button
+            id="change-password-button"
+            class="button subtle"
+            type="button"
+          >
+            Change Password
+          </button>
 
-        <button
-          id="remove-avatar"
-          class="button subtle"
-          type="button"
-        >
-          Remove picture
-        </button>
+          <div id="password-fields" class="stack hidden">
+            <label for="current-password">Current password</label>
+            <input
+              id="current-password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Current password"
+            >
 
-        <div class="divider"></div>
+            <label for="new-password">New password</label>
+            <input
+              id="new-password"
+              type="password"
+              minlength="6"
+              autocomplete="new-password"
+              placeholder="New password"
+            >
+          </div>
+        </div>
 
-        <label for="edit-email">Email</label>
-        <input
-          id="edit-email"
-          type="email"
-          autocomplete="email"
-          required
-        >
+        <div class="profile-picture-row">
+          <div class="profile-picture-preview-column">
+            <label>Profile picture</label>
+            <div
+              id="edit-avatar-preview"
+              class="profile-avatar large"
+              aria-label="New profile picture preview"
+            >?</div>
+          </div>
 
-        <label for="current-password">Current password</label>
-        <input
-          id="current-password"
-          type="password"
-          autocomplete="current-password"
-        >
+          <div class="profile-picture-actions stack">
+            <label for="edit-avatar">Choose file</label>
+            <input
+              id="edit-avatar"
+              type="file"
+              accept="image/*"
+            >
 
-        <label for="new-password">New password (optional)</label>
-        <input
-          id="new-password"
-          type="password"
-          minlength="6"
-          autocomplete="new-password"
-          placeholder="New password"
-        >
+            <button
+              id="remove-avatar"
+              class="button subtle"
+              type="button"
+            >
+              Remove picture
+            </button>
+          </div>
+        </div>
 
         <div class="button-row">
           <button
