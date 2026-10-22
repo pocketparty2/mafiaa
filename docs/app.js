@@ -282,6 +282,10 @@ function renderProfile() {
 
   $("profile-display-name").textContent = name;
   $("profile-email").textContent = currentUser?.email || "";
+  
+  $("change-password-button").addEventListener("click", () => {
+    $("password-fields").classList.toggle("hidden");
+  });
 
   renderAvatar($("profile-avatar"), profile.avatarData, name);
 
