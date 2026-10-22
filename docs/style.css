@@ -977,3 +977,15 @@ button {
     height: 72px;
   }
 }
+
+#profile-editor > .button-row {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  width: 100%;
+}
+
+#profile-editor > .button-row .button {
+  flex: 1;
+  min-width: 0;
+}
