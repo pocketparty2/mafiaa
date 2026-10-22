@@ -257,3 +257,15 @@ footer span { color: var(--accent); padding: 0 5px; }
 #signup-fields {
   margin: 8px 0 16px;
 }
+
+/* Keep profile pictures fully contained in their circles */
+#profile-avatar,
+#signup-avatar-preview,
+#edit-avatar-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  overflow: hidden;
+}
