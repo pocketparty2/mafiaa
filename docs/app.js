@@ -1,4 +1,3 @@
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import {
   getAuth,
@@ -46,7 +45,7 @@ const NIGHT_SECONDS = 35;
 const DISCUSSION_SECONDS = 25;
 const VOTING_SECONDS = 35;
 const MAX_PLAYERS = 12;
-const MIN_PLAYERS = 5;
+const MIN_PLAYERS = 3;
 
 let currentUser = null;
 let profile = { displayName: "", avatarData: "" };
