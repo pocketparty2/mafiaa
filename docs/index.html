@@ -244,21 +244,90 @@
       </div>
     </section>
 
+    
     <!-- GAME -->
     <section id="game-screen" class="hidden">
 
       <div class="room-heading">
-        <div>
-          <p class="eyebrow">GAME ROOM</p>
-          <h1>Room <span id="room-code-display">----</span></h1>
-        </div>
+        <h1>
+          Room
+          <button id="room-code-copy" class="room-code-copy" type="button" aria-label="Copy room code">
+            <span id="room-code-display">----</span>
+          </button>
+        </h1>
 
-        <button id="copy-code" class="button" type="button">
-          Copy code
+        <button id="leave-room" class="button subtle" type="button">
+          Leave room
         </button>
       </div>
 
-      <div class="game-grid">
+      <!-- LOBBY -->
+      <section id="lobby-layout" class="lobby-layout hidden">
+
+        <!-- HOST TABS -->
+        <div id="lobby-tabs" class="lobby-tabs hidden" role="tablist" aria-label="Lobby">
+          <button
+            class="lobby-tab active"
+            type="button"
+            data-lobby-tab="settings"
+            role="tab"
+            aria-selected="true"
+          >
+            Settings
+          </button>
+
+          <button
+            class="lobby-tab"
+            type="button"
+            data-lobby-tab="players"
+            role="tab"
+            aria-selected="false"
+          >
+            Players
+          </button>
+        </div>
+
+        <!-- HOST SETTINGS -->
+        <section id="lobby-settings-panel" class="panel hidden">
+          <p class="eyebrow">LOBBY SETTINGS</p>
+
+          <label id="reveal-setting" class="toggle-row">
+            <input id="reveal-check" type="checkbox" checked>
+            <span>Reveal roles on death</span>
+          </label>
+
+          <button id="start-game" class="button primary" type="button">
+            Start game
+          </button>
+        </section>
+
+        <!-- LOBBY PLAYER LIST -->
+        <section id="lobby-players-panel" class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">THE SUSPECTS</p>
+              <h2>
+                Players
+                <span id="lobby-player-count" class="muted">0/12</span>
+              </h2>
+            </div>
+          </div>
+
+          <div id="lobby-player-list" class="player-list player-card-grid"></div>
+        </section>
+
+        <!-- READY BUTTON FOR EVERYONE -->
+        <section id="lobby-controls" class="panel lobby-ready-panel">
+          <label class="toggle-row ready-toggle">
+            <input id="ready-check" type="checkbox">
+            <span>Ready to play</span>
+          </label>
+        </section>
+
+      </section>
+
+      <!-- ACTIVE GAME -->
+      <div id="game-grid" class="game-grid hidden">
 
         <!-- GAME STATUS AND ACTIONS -->
         <section class="panel">
@@ -285,61 +354,25 @@
             <p id="team-info" class="muted"></p>
           </div>
 
-          <div id="lobby-controls" class="stack">
-            <label class="toggle-row">
-              <input id="ready-check" type="checkbox">
-              <span>Ready to play</span>
-            </label>
-
-            <label id="reveal-setting" class="toggle-row hidden">
-              <input id="reveal-check" type="checkbox" checked>
-              <span>Reveal roles on death</span>
-            </label>
-
-            <button
-              id="start-game"
-              class="button primary hidden"
-              type="button"
-            >
-              Start game
-            </button>
-          </div>
-
           <div id="action-controls" class="stack hidden">
             <label for="target-select">Choose a player</label>
             <select id="target-select"></select>
 
             <div id="night-buttons" class="button-row hidden">
-              <button
-                data-action="kill"
-                class="button danger"
-                type="button"
-              >
+              <button data-action="kill" class="button danger" type="button">
                 Choose victim
               </button>
 
-              <button
-                data-action="investigate"
-                class="button primary"
-                type="button"
-              >
+              <button data-action="investigate" class="button primary" type="button">
                 Investigate
               </button>
 
-              <button
-                data-action="protect"
-                class="button"
-                type="button"
-              >
+              <button data-action="protect" class="button" type="button">
                 Protect
               </button>
             </div>
 
-            <button
-              id="submit-vote"
-              class="button primary hidden"
-              type="button"
-            >
+            <button id="submit-vote" class="button primary hidden" type="button">
               Cast vote
             </button>
 
@@ -351,17 +384,9 @@
             <h2 id="winner-text"></h2>
             <p>The game has ended.</p>
           </div>
-
-          <button
-            id="leave-room"
-            class="button subtle"
-            type="button"
-          >
-            Leave room
-          </button>
         </section>
 
-        <!-- PLAYER LIST -->
+        <!-- IN-GAME PLAYER LIST -->
         <section class="panel">
           <div class="section-heading">
             <div>
@@ -373,7 +398,7 @@
             </div>
           </div>
 
-          <div id="player-list" class="player-list"></div>
+          <div id="player-list" class="player-list player-card-grid"></div>
         </section>
 
       </div>
