@@ -300,16 +300,14 @@
 
           <p class="role-count-heading">ROLE COUNTS</p>
           <div id="role-count-settings" class="role-count-grid">
-            <label for="role-count-mafia">Mafia</label>
+            <label for="role-count-mafia">🔪 Mafia</label>
             <input id="role-count-mafia" type="number" min="0" max="12" step="1" value="1">
-            <label for="role-count-detective">Detective</label>
+            <label for="role-count-detective">🔎 Detective</label>
             <input id="role-count-detective" type="number" min="0" max="12" step="1" value="0">
-            <label for="role-count-doctor">Doctor</label>
+            <label for="role-count-doctor">🏥 Doctor</label>
             <input id="role-count-doctor" type="number" min="0" max="12" step="1" value="0">
-            <span class="role-count-label">Townsperson</span>
-            <strong id="role-count-townsperson" class="role-count-auto">0</strong>
           </div>
-          <p id="role-count-summary" class="role-count-summary">Remaining players become Townspeople automatically.</p>
+          <p class="role-count-summary">All remaining players are assigned as Townspeople.</p>
 
           <button id="start-game" class="button primary" type="button">
             Start game
@@ -328,6 +326,7 @@
             </div>
           </div>
 
+          <div id="lobby-role-roster" class="lobby-role-roster" aria-label="Roles in this game"></div>
           <div id="lobby-player-list" class="player-list player-card-grid"></div>
         </section>
 
