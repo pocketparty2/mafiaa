@@ -690,3 +690,15 @@
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stats-grid > div:first-child { grid-column: span 2; }
 }
+
+
+.stats-breakdowns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.stats-breakdowns h3 { margin: 0 0 7px; font-size: 12px; }
+.breakdown-list { display: grid; gap: 5px; }
+.breakdown-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 7px; background: var(--surface, rgba(127,127,127,.08)); font-size: 10px; }
+.breakdown-row strong { text-align: right; white-space: nowrap; font-size: 10px; }
+.leaderboard-entry { display: grid; gap: 5px; }
+.leaderboard-breakdown { padding: 0 10px 8px 52px; color: var(--muted); font-size: 10px; }
+.leaderboard-breakdown summary { cursor: pointer; margin-bottom: 7px; }
+.leaderboard-breakdown > strong { display: block; margin: 7px 0 4px; color: var(--text, inherit); }
+@media (max-width: 620px) { .stats-breakdowns { grid-template-columns: 1fr; } .leaderboard-breakdown { padding-left: 12px; } }
