@@ -988,7 +988,7 @@ function connectToRoom(code) {
     if (!snapshot.exists()) {
       showNotice("This room no longer exists.", true);
       disconnectRoomListeners();
-      localStorage.removeItem(activeRoomStorageKey(currentUser.uid));
+      if (currentUser) localStorage.removeItem(activeRoomStorageKey(currentUser.uid));
       roomCode = null;
       room = null;
       players = [];
