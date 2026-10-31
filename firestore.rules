@@ -118,6 +118,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /leaderboard/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'avatarData', 'gamesPlayed', 'wins', 'losses',
+          'winRate', 'roleGames', 'roleWins', 'alignmentGames', 'alignmentWins',
+          'mostPlayedRole', 'mostPlayedAlignment', 'currentWinStreak',
+          'bestWinStreak', 'updatedAt'
+        ]);
+      allow delete: if false;
+
+      match /games/{gameId} {
+        allow read, create: if signedIn() && request.auth.uid == userId;
+        allow update, delete: if false;
+      }
+    }
+
     match /rooms/{code} {
       allow read: if isMember(code);
 
