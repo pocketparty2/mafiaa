@@ -708,3 +708,97 @@
 .home-navigation { margin: 14px 0 4px; }
 #statistics-screen, #leaderboard-screen { margin-top: 14px; }
 #statistics-screen .stats-panel { margin: 0; }
+
+
+/* Compact, centered home navigation */
+.home-navigation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+}
+.home-navigation .button {
+  min-height: 34px;
+  padding: 7px 13px;
+  font-size: 12px;
+  flex: 0 1 auto;
+}
+@media (max-width: 520px) {
+  .home-navigation { flex-wrap: nowrap; gap: 7px; }
+  .home-navigation .button {
+    min-width: 0;
+    padding: 7px 10px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
+
+/* Collapsible alignment groups and touch-friendly role steppers */
+#role-count-settings { display: grid; grid-template-columns: 1fr; gap: 7px; margin: 6px 0; }
+.role-alignment-settings { padding: 0; overflow: hidden; }
+.role-alignment-settings > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 9px 11px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .6px;
+}
+.role-alignment-settings > summary::-webkit-details-marker { display: none; }
+.role-alignment-settings > summary::after { content: "+"; font-size: 18px; line-height: 1; }
+.role-alignment-settings[open] > summary::after { content: "−"; }
+.role-alignment-settings .role-count-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 7px 10px;
+  padding: 0 10px 10px;
+}
+.role-alignment-settings .role-count-grid label { font-size: 12px; }
+.role-stepper { display: flex; align-items: center; gap: 5px; }
+.role-stepper input {
+  width: 43px;
+  min-height: 36px !important;
+  padding: 4px !important;
+  text-align: center;
+  font-size: 14px !important;
+}
+.role-step-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border, rgba(127,127,127,.25));
+  border-radius: 8px;
+  background: var(--surface, rgba(127,127,127,.1));
+  color: var(--text, inherit);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.role-step-button:disabled { opacity: .4; cursor: not-allowed; }
+#lobby-settings-panel #start-game { width: 100%; min-height: 42px; margin-top: 10px; }
+
+@media (max-width: 700px) {
+  #game-screen .lobby-layout {
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 12px;
+  }
+  #game-screen .lobby-layout > .panel {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+  #game-screen #lobby-settings-panel { order: 1; }
+  #game-screen #lobby-players-panel { order: 2; flex: 0 0 auto; }
+  #game-screen #lobby-role-panel { order: 3; flex: 0 0 auto; }
+  #game-screen #lobby-controls { order: 4; flex: 0 0 auto; }
+}
