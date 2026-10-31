@@ -757,6 +757,143 @@ $("join-form").addEventListener("submit", async event => {
   }
 });
 
+/* -------------------- PLAYER STATISTICS -------------------- */
+
+function alignmentForRole(role) {
+  if (["Mafia", "Silencer"].includes(role)) return "Mafia";
+  if (["Detective", "Doctor", "Mayor", "Townsperson"].includes(role)) return "Town";
+  return "Neutral";
+}
+
+function incrementMap(source, key, amount = 1) {
+  return { ...(source || {}), [key]: Number(source?.[key] || 0) + amount };
+}
+
+function mostPlayedKey(map) {
+  return Object.entries(map || {}).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+}
+
+async function recordMyGameStats() {
+  if (!currentUser || !roomCode || !room || room.phase !== "finished") return;
+  const player = players.find(item => item.id === currentUser.uid);
+  const role = privateByUid[currentUser.uid]?.role;
+  if (!player || !role || !room.winner) return;
+
+  const code = roomCode;
+  const alignment = alignmentForRole(role);
+  const won = room.winner === "Jester"
+    ? role === "Jester"
+    : room.winner === alignment && alignment !== "Neutral";
+  const statsRef = doc(db, "leaderboard", currentUser.uid);
+  const gameRef = doc(db, "leaderboard", currentUser.uid, "games", code);
+
+  await runTransaction(db, async transaction => {
+    const statsSnapshot = await transaction.get(statsRef);
+    const gameSnapshot = await transaction.get(gameRef);
+    if (gameSnapshot.exists()) return;
+
+    const old = statsSnapshot.exists() ? statsSnapshot.data() : {};
+    const gamesPlayed = Number(old.gamesPlayed || 0) + 1;
+    const wins = Number(old.wins || 0) + (won ? 1 : 0);
+    const roleGames = incrementMap(old.roleGames, role);
+    const roleWins = incrementMap(old.roleWins, role, won ? 1 : 0);
+    const alignmentGames = incrementMap(old.alignmentGames, alignment);
+    const alignmentWins = incrementMap(old.alignmentWins, alignment, won ? 1 : 0);
+    const currentWinStreak = won ? Number(old.currentWinStreak || 0) + 1 : 0;
+    const bestWinStreak = Math.max(Number(old.bestWinStreak || 0), currentWinStreak);
+
+    transaction.set(statsRef, {
+      uid: currentUser.uid,
+      displayName: player.name || getDisplayName(),
+      avatarData: player.avatarData || profile.avatarData || "",
+      gamesPlayed,
+      wins,
+      losses: gamesPlayed - wins,
+      winRate: gamesPlayed ? wins / gamesPlayed : 0,
+      roleGames,
+      roleWins,
+      alignmentGames,
+      alignmentWins,
+      mostPlayedRole: mostPlayedKey(roleGames),
+      mostPlayedAlignment: mostPlayedKey(alignmentGames),
+      currentWinStreak,
+      bestWinStreak,
+      updatedAt: serverTimestamp()
+    });
+    transaction.set(gameRef, {
+      roomCode: code,
+      role,
+      alignment,
+      winner: room.winner,
+      won,
+      completedAt: serverTimestamp()
+    });
+  });
+
+  await loadMyStats();
+}
+
+function openLeaderboard() {
+  setVisible("home-content", false);
+  setVisible("leaderboard-panel", true);
+  loadLeaderboard();
+}
+
+function closeLeaderboard() {
+  setVisible("leaderboard-panel", false);
+  setVisible("home-content", true);
+}
+
+async function loadLeaderboard() {
+  const list = $("leaderboard-list");
+  list.textContent = "Loading leaderboard…";
+  try {
+    const snapshot = await getDocs(collection(db, "leaderboard"));
+    const entries = snapshot.docs
+      .map(item => ({ uid: item.id, ...item.data() }))
+      .filter(item => Number(item.gamesPlayed || 0) > 0)
+      .sort((a, b) =>
+        Number(b.winRate || 0) - Number(a.winRate || 0) ||
+        Number(b.wins || 0) - Number(a.wins || 0) ||
+        Number(b.gamesPlayed || 0) - Number(a.gamesPlayed || 0)
+      );
+
+    list.replaceChildren();
+    if (!entries.length) {
+      list.textContent = "No completed games yet. Be the first onto the leaderboard!";
+      return;
+    }
+
+    entries.forEach((entry, index) => {
+      const row = document.createElement("article");
+      row.className = "leaderboard-row";
+      const rank = document.createElement("strong");
+      rank.className = "leaderboard-rank";
+      rank.textContent = `#${index + 1}`;
+      const avatar = document.createElement("div");
+      avatar.className = "profile-avatar leaderboard-avatar";
+      renderAvatar(avatar, entry.avatarData || "", entry.displayName || "Player");
+      const identity = document.createElement("div");
+      identity.className = "leaderboard-identity";
+      const name = document.createElement("strong");
+      name.textContent = entry.displayName || "Player";
+      const detail = document.createElement("span");
+      detail.textContent = `${entry.wins || 0} wins · ${entry.gamesPlayed || 0} games`;
+      identity.append(name, detail);
+      const rate = document.createElement("strong");
+      rate.className = "leaderboard-rate";
+      rate.textContent = `${Math.round(Number(entry.winRate || 0) * 100)}%`;
+      row.append(rank, avatar, identity, rate);
+      list.append(row);
+    });
+  } catch (error) {
+    list.textContent = `Couldn't load leaderboard: ${friendlyError(error)}`;
+  }
+}
+
+$("leaderboard-button").addEventListener("click", openLeaderboard);
+$("leaderboard-back").addEventListener("click", closeLeaderboard);
+
 /* -------------------- ROOM LISTENERS -------------------- */
 
 function disconnectRoomListeners() {
