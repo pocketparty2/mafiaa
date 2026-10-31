@@ -702,3 +702,9 @@
 .leaderboard-breakdown summary { cursor: pointer; margin-bottom: 7px; }
 .leaderboard-breakdown > strong { display: block; margin: 7px 0 4px; color: var(--text, inherit); }
 @media (max-width: 620px) { .stats-breakdowns { grid-template-columns: 1fr; } .leaderboard-breakdown { padding-left: 12px; } }
+
+
+/* Separate statistics and leaderboard pages */
+.home-navigation { margin: 14px 0 4px; }
+#statistics-screen, #leaderboard-screen { margin-top: 14px; }
+#statistics-screen .stats-panel { margin: 0; }
