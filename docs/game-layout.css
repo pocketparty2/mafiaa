@@ -1,6 +1,7 @@
 /* Single-screen game layout: keep every game view inside the viewport. */
 #game-screen {
-  height: calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  flex: 1 1 auto;
+  height: auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -47,6 +48,7 @@
 }
 
 #game-screen #lobby-players-panel {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -241,10 +243,6 @@
 }
 
 @media (max-width: 700px) {
-  #game-screen {
-    height: calc(100dvh - 62px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  }
-
   #game-screen .room-heading {
     margin-bottom: 6px;
   }
