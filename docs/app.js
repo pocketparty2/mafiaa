@@ -1032,7 +1032,7 @@ function renderGame() {
 
   const roleCounts = getRoleCounts();
   let selectedRoleTotal = 0;
-  ["Mafia", "Detective", "Doctor"].forEach(role => {
+  ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester"].forEach(role => {
     const count = roleCounts[role];
     const input = $("role-count-" + role.toLowerCase());
     input.value = String(count);
@@ -1055,7 +1055,11 @@ function renderGame() {
   if (role) {
     const roleInfo = {
       Mafia: {
-        description: "Each night, help eliminate a Town player without being discovered.",
+        description: "Each night, vote with the Mafia to eliminate a player.",
+        team: "You win when the Mafia equal or outnumber the Town."
+      },
+      Silencer: {
+        description: "Each night, choose a player who will be unable to vote the following day. You are part of the Mafia team.",
         team: "You win when the Mafia equal or outnumber the Town."
       },
       Detective: {
@@ -1065,6 +1069,14 @@ function renderGame() {
       Doctor: {
         description: "Protect one living player each night from the Mafia's attack.",
         team: "You win by helping the Town eliminate the Mafia."
+      },
+      Mayor: {
+        description: "Your daytime vote counts twice. Use it carefully to help the Town identify the Mafia.",
+        team: "You win when all Mafia members are eliminated."
+      },
+      Jester: {
+        description: "You win immediately if the Town eliminates you in the daytime vote. You have no night action.",
+        team: "You win only by being eliminated by the daytime vote."
       },
       Townsperson: {
         description: "You have no special night action. Use discussion and voting to find the Mafia.",
@@ -1101,7 +1113,9 @@ function renderGame() {
     ? "The Mafia win."
     : room.winner === "Town"
       ? "The Town wins."
-      : "Game over";
+      : room.winner === "Jester"
+        ? "The Jester wins!"
+        : "Game over";
 
   renderPlayers();
   renderTargetOptions();
@@ -1118,23 +1132,32 @@ function renderRoleRoster() {
   if (!roster) return;
 
   const counts = getRoleCounts();
-  const roleDetails = [
-    { role: "Mafia", emoji: "🔪" },
-    { role: "Detective", emoji: "🔎" },
-    { role: "Doctor", emoji: "🏥" },
-    { role: "Townsperson", emoji: "🧍" }
+  const alignments = [
+    { name: "MAFIA", roles: [{ role: "Mafia", emoji: "🔪" }, { role: "Silencer", emoji: "🤫" }] },
+    { name: "TOWN", roles: [{ role: "Detective", emoji: "🔎" }, { role: "Doctor", emoji: "🏥" }, { role: "Mayor", emoji: "⚖️" }, { role: "Townsperson", emoji: "🧍" }] },
+    { name: "NEUTRAL", roles: [{ role: "Jester", emoji: "🃏" }] }
   ];
 
   roster.replaceChildren();
 
-  roleDetails.forEach(({ role, emoji }) => {
-    const count = counts[role] || 0;
-    if (count < 1) return;
+  alignments.forEach(alignment => {
+    const group = document.createElement("div");
+    group.className = "lobby-role-alignment";
+    const heading = document.createElement("strong");
+    heading.className = "lobby-role-alignment-title";
+    heading.textContent = alignment.name;
+    group.append(heading);
 
-    const item = document.createElement("span");
-    item.className = "lobby-role-item";
-    item.textContent = `${emoji} ${role} ×${count}`;
-    roster.append(item);
+    alignment.roles.forEach(({ role, emoji }) => {
+      const count = counts[role] || 0;
+      if (count < 1) return;
+      const item = document.createElement("span");
+      item.className = "lobby-role-item";
+      item.textContent = `${emoji} ${role} ×${count}`;
+      group.append(item);
+    });
+
+    if (group.querySelector(".lobby-role-item")) roster.append(group);
   });
 
   if (!roster.childElementCount) {
@@ -1229,6 +1252,7 @@ function getCurrentActionType() {
   if (room?.phase !== "night") return null;
   return ({
     Mafia: "kill",
+    Silencer: "silence",
     Doctor: "protect",
     Detective: "investigate"
   })[myRole()] || null;
@@ -1256,6 +1280,13 @@ function getActionCopy(type) {
       hint: "Choose a player to protect tonight, then lock it in.",
       button: "Lock in protection",
       locked: "Your protection is locked in."
+    },
+    silence: {
+      kind: "SILENCER ACTION",
+      title: "Who will you silence?",
+      hint: "Choose a player who will be unable to vote tomorrow, then lock in your choice.",
+      button: "Lock in silence",
+      locked: "Your silence target is locked in."
     },
     investigate: {
       kind: "DETECTIVE ACTION",
@@ -1285,7 +1316,7 @@ function getActionCandidates() {
       player.id !== selfUid && !teammates.includes(player.id)
     );
   } else if (
-    (phase === "night" && ["Detective", "Doctor"].includes(role)) ||
+    (phase === "night" && ["Detective", "Doctor", "Silencer"].includes(role)) ||
     phase === "voting"
   ) {
     candidates = candidates.filter(player => player.id !== selfUid);
@@ -1366,7 +1397,8 @@ function renderActionControls() {
     myAction.round === room?.round
       ? myAction
       : null;
-  const eligible = alive && Boolean(type);
+  const silenced = phase === "voting" && privateByUid[currentUser?.uid]?.silencedRound === room?.round;
+  const eligible = alive && Boolean(type) && !silenced;
   const copy = getActionCopy(type);
 
   $("action-kind").textContent = copy.kind;
@@ -1387,6 +1419,8 @@ function renderActionControls() {
   } else if (!alive && !["lobby", "finished"].includes(phase)) {
     $("action-status").textContent =
       "You've been eliminated. You can watch, but you can't act.";
+  } else if (silenced) {
+    $("action-status").textContent = "You have been silenced and cannot vote this round.";
   } else if (phase === "night" && !eligible) {
     $("action-status").textContent = "Your role has no action tonight.";
   } else {
@@ -1459,14 +1493,17 @@ $("reveal-check").addEventListener("change", async event => {
   }
 });
 
-const ROLE_NAMES = ["Mafia", "Detective", "Doctor", "Townsperson"];
+const ROLE_NAMES = ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Townsperson"];
 
 function getRoleCounts() {
   const saved = room?.settings?.roleCounts || {};
   const counts = {
     Mafia: Number.isInteger(saved.Mafia) ? saved.Mafia : 1,
+    Silencer: Number.isInteger(saved.Silencer) ? saved.Silencer : 0,
     Detective: Number.isInteger(saved.Detective) ? saved.Detective : 0,
-    Doctor: Number.isInteger(saved.Doctor) ? saved.Doctor : 0
+    Doctor: Number.isInteger(saved.Doctor) ? saved.Doctor : 0,
+    Mayor: Number.isInteger(saved.Mayor) ? saved.Mayor : 0,
+    Jester: Number.isInteger(saved.Jester) ? saved.Jester : 0
   };
   counts.Townsperson = Math.max(0, players.length - Object.values(counts).reduce((sum, count) => sum + count, 0));
   return counts;
@@ -1475,7 +1512,7 @@ function getRoleCounts() {
 async function saveRoleCounts() {
   if (!isHost() || room?.phase !== "lobby") return;
   const roleCounts = {};
-  for (const role of ["Mafia", "Detective", "Doctor"]) {
+  for (const role of ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester"]) {
     const input = $("role-count-" + role.toLowerCase());
     const value = Number(input?.value);
     if (!Number.isInteger(value) || value < 0 || value > MAX_PLAYERS) {
@@ -1522,6 +1559,10 @@ async function startGame() {
     const selectedRoleTotal = Object.values(roleCounts).reduce((total, count) => total + count, 0);
     if (Object.values(roleCounts).some(count => !Number.isInteger(count) || count < 0 || count > MAX_PLAYERS) || selectedRoleTotal > players.length) {
       throw new Error("The selected special roles cannot exceed the number of players.");
+    }
+
+    if (roleCounts.Silencer > 0 && roleCounts.Mafia < 1) {
+      throw new Error("You need at least one standard Mafia member when using a Silencer.");
     }
 
     const rolePool = [];
@@ -1595,6 +1636,7 @@ async function submitAction(type, targetUid) {
   if (phase === "night") {
     const allowed = (
       (type === "kill" && role === "Mafia") ||
+      (type === "silence" && role === "Silencer") ||
       (type === "protect" && role === "Doctor") ||
       (type === "investigate" && role === "Detective")
     );
@@ -1610,6 +1652,11 @@ async function submitAction(type, targetUid) {
   }
 
   const self = me();
+
+  if (phase === "voting" && privateByUid[currentUser.uid]?.silencedRound === room.round) {
+    showNotice("You have been silenced and cannot vote this round.", true);
+    return;
+  }
 
   if (!self || self.alive === false) {
     showNotice("Eliminated players can't submit actions.", true);
@@ -1680,7 +1727,7 @@ function requiredNightActors() {
     if (player.alive === false) return false;
 
     const role = privateByUid[player.id]?.role;
-    return ["Mafia", "Doctor", "Detective"].includes(role);
+    return ["Mafia", "Silencer", "Doctor", "Detective"].includes(role);
   });
 }
 
@@ -1695,7 +1742,9 @@ function allRequiredActionsSubmitted() {
   }
 
   if (room.phase === "voting") {
-    const voters = alivePlayers();
+    const voters = alivePlayers().filter(player =>
+      privateByUid[player.id]?.silencedRound !== room.round
+    );
 
     return voters.length > 0 &&
       voters.every(player => hasSubmitted(player.id, "voting"));
@@ -1727,10 +1776,12 @@ async function checkWinner() {
   const living = alivePlayers();
 
   const mafiaAlive = living.filter(player =>
-    privateByUid[player.id]?.role === "Mafia"
+    ["Mafia", "Silencer"].includes(privateByUid[player.id]?.role)
   ).length;
 
-  const townAlive = living.length - mafiaAlive;
+  const townAlive = living.filter(player =>
+    ["Detective", "Doctor", "Mayor", "Townsperson"].includes(privateByUid[player.id]?.role)
+  ).length;
 
   if (mafiaAlive === 0) return "Town";
   if (mafiaAlive >= townAlive) return "Mafia";
@@ -1782,7 +1833,7 @@ async function finishGame(winner) {
   });
 
   await clearActions();
-  showNotice(winner === "Town" ? "The Town has won!" : "The Mafia has won!");
+  showNotice(winner === "Town" ? "The Town has won!" : winner === "Jester" ? "The Jester has won!" : "The Mafia has won!");
 }
 
 async function resolvePhase() {
@@ -1833,6 +1884,13 @@ async function resolvePhase() {
         players.some(player => player.id === action.targetUid && player.alive !== false)
       );
 
+      const silenceActions = nightActions.filter(action =>
+        action.type === "silence" &&
+        privateByUid[action.uid]?.role === "Silencer" &&
+        players.some(player => player.id === action.uid && player.alive !== false) &&
+        players.some(player => player.id === action.targetUid && player.alive !== false)
+      );
+
       const detectiveActions = nightActions.filter(action =>
         action.type === "investigate" &&
         privateByUid[action.uid]?.role === "Detective" &&
@@ -1865,6 +1923,13 @@ async function resolvePhase() {
         await revealEliminatedPlayer(killedUid);
       }
 
+      for (const action of silenceActions) {
+        await setDoc(privateRef(action.targetUid), {
+          ...(privateByUid[action.targetUid] || {}),
+          silencedRound: round
+        });
+      }
+
       for (const action of detectiveActions) {
         const targetRole = privateByUid[action.targetUid]?.role;
         const result = targetRole === "Mafia"
@@ -1891,6 +1956,7 @@ async function resolvePhase() {
     if (phase === "voting") {
       const votes = currentActions("voting").filter(action =>
         action.type === "vote" &&
+        privateByUid[action.uid]?.silencedRound !== round &&
         players.some(player =>
           player.id === action.uid && player.alive !== false
         ) &&
@@ -1902,7 +1968,9 @@ async function resolvePhase() {
       const counts = {};
 
       votes.forEach(action => {
-        counts[action.targetUid] = (counts[action.targetUid] || 0) + 1;
+        const voterRole = privateByUid[action.uid]?.role;
+        const weight = voterRole === "Mayor" ? 2 : 1;
+        counts[action.targetUid] = (counts[action.targetUid] || 0) + weight;
       });
 
       let eliminatedUid = null;
@@ -1917,6 +1985,12 @@ async function resolvePhase() {
         if (topTargets.length === 1) {
           eliminatedUid = topTargets[0];
         }
+      }
+
+      if (eliminatedUid && privateByUid[eliminatedUid]?.role === "Jester") {
+        await revealEliminatedPlayer(eliminatedUid);
+        await finishGame("Jester");
+        return;
       }
 
       if (eliminatedUid) {
