@@ -1092,7 +1092,7 @@ function renderGame() {
     $("investigation-result").textContent = investigation || "";
 
     if (
-      role === "Mafia" &&
+      ["Mafia", "Silencer"].includes(role) &&
       privateByUid[currentUser.uid]?.mafiaTeammates?.length
     ) {
       const names = privateByUid[currentUser.uid].mafiaTeammates
@@ -1310,7 +1310,7 @@ function getActionCandidates() {
   const selfUid = currentUser?.uid;
   let candidates = alivePlayers();
 
-  if (phase === "night" && role === "Mafia") {
+  if (phase === "night" && ["Mafia", "Silencer"].includes(role)) {
     const teammates = privateByUid[selfUid]?.mafiaTeammates || [];
     candidates = candidates.filter(player =>
       player.id !== selfUid && !teammates.includes(player.id)
@@ -1575,7 +1575,7 @@ async function startGame() {
     shuffledPlayers.forEach((player, index) => roleAssignments.set(player.id, shuffledRoles[index]));
 
     const mafiaUids = [...roleAssignments.entries()]
-      .filter(([, role]) => role === "Mafia")
+      .filter(([, role]) => ["Mafia", "Silencer"].includes(role))
       .map(([uid]) => uid);
 
     const writes = players.map(async player => {
@@ -1584,7 +1584,7 @@ async function startGame() {
       await setDoc(privateRef(player.id), {
         role,
         investigationResult: "",
-        mafiaTeammates: role === "Mafia"
+        mafiaTeammates: ["Mafia", "Silencer"].includes(role)
           ? mafiaUids.filter(uid => uid !== player.id)
           : []
       });
@@ -1923,13 +1923,6 @@ async function resolvePhase() {
         await revealEliminatedPlayer(killedUid);
       }
 
-      for (const action of silenceActions) {
-        await setDoc(privateRef(action.targetUid), {
-          ...(privateByUid[action.targetUid] || {}),
-          silencedRound: round
-        });
-      }
-
       for (const action of detectiveActions) {
         const targetRole = privateByUid[action.targetUid]?.role;
         const result = targetRole === "Mafia"
@@ -1939,6 +1932,13 @@ async function resolvePhase() {
         await setDoc(privateRef(action.uid), {
           ...privateByUid[action.uid],
           investigationResult: result
+        });
+      }
+
+      for (const action of silenceActions) {
+        await setDoc(privateRef(action.targetUid), {
+          ...(privateByUid[action.targetUid] || {}),
+          silencedRound: round
         });
       }
 
