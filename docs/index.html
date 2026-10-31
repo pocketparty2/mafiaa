@@ -344,37 +344,67 @@
 
           <p class="role-count-heading">ROLE COUNTS</p>
           <div id="role-count-settings">
-            <div class="role-alignment-settings">
-              <h3>🔪 Mafia</h3>
+            <details class="role-alignment-settings">
+              <summary>🔪 Mafia</summary>
               <div class="role-count-grid">
                 <label for="role-count-mafia">Mafia</label>
-                <input id="role-count-mafia" type="number" min="0" max="12" step="1" value="1">
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="mafia" data-step="-1" aria-label="Decrease Mafia">−</button>
+                  <input id="role-count-mafia" type="number" min="0" max="12" step="1" value="1">
+                  <button class="role-step-button" type="button" data-role-step="mafia" data-step="1" aria-label="Increase Mafia">+</button>
+                </div>
                 <label for="role-count-silencer">Silencer</label>
-                <input id="role-count-silencer" type="number" min="0" max="12" step="1" value="0">
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="silencer" data-step="-1" aria-label="Decrease Silencer">−</button>
+                  <input id="role-count-silencer" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="silencer" data-step="1" aria-label="Increase Silencer">+</button>
+                </div>
+
               </div>
-            </div>
-            <div class="role-alignment-settings">
-              <h3>🏘️ Town</h3>
+            </details>
+            <details class="role-alignment-settings">
+              <summary>🏘️ Town</summary>
               <div class="role-count-grid">
                 <label for="role-count-detective">Detective</label>
-                <input id="role-count-detective" type="number" min="0" max="12" step="1" value="0">
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="detective" data-step="-1" aria-label="Decrease Detective">−</button>
+                  <input id="role-count-detective" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="detective" data-step="1" aria-label="Increase Detective">+</button>
+                </div>
                 <label for="role-count-doctor">Doctor</label>
-                <input id="role-count-doctor" type="number" min="0" max="12" step="1" value="0">
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="doctor" data-step="-1" aria-label="Decrease Doctor">−</button>
+                  <input id="role-count-doctor" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="doctor" data-step="1" aria-label="Increase Doctor">+</button>
+                </div>
                 <label for="role-count-mayor">Mayor</label>
-                <input id="role-count-mayor" type="number" min="0" max="12" step="1" value="0">
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="mayor" data-step="-1" aria-label="Decrease Mayor">−</button>
+                  <input id="role-count-mayor" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="mayor" data-step="1" aria-label="Increase Mayor">+</button>
+                </div>
                 <label>Townsperson</label>
                 <span class="role-count-auto">Auto</span>
               </div>
-            </div>
-            <div class="role-alignment-settings">
-              <h3>🃏 Neutral</h3>
+            </details>
+            <details class="role-alignment-settings">
+              <summary>🃏 Neutral</summary>
               <div class="role-count-grid">
                 <label for="role-count-jester">Jester</label>
-                <input id="role-count-jester" type="number" min="0" max="12" step="1" value="0">
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="jester" data-step="-1" aria-label="Decrease Jester">−</button>
+                  <input id="role-count-jester" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="jester" data-step="1" aria-label="Increase Jester">+</button>
+                </div>
                 <label for="role-count-thief">Thief</label>
-                <input id="role-count-thief" type="number" min="0" max="12" step="1" value="0">
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="thief" data-step="-1" aria-label="Decrease Thief">−</button>
+                  <input id="role-count-thief" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="thief" data-step="1" aria-label="Increase Thief">+</button>
+                </div>
+
               </div>
-            </div>
+            </details>
           </div>
           <p class="role-count-summary">Townsperson automatically fills any remaining spaces. A Silencer requires at least one Mafia. Thieves need 5 tokens to steal a deceased player’s role.</p>
 
