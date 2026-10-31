@@ -5,6 +5,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
   signOut,
   updateEmail,
   updatePassword,
@@ -22,7 +24,8 @@ import {
   deleteDoc,
   runTransaction,
   serverTimestamp,
-  arrayUnion
+  arrayUnion,
+  getDocs
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -37,6 +40,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+await setPersistence(auth, browserLocalPersistence);
 const db = getFirestore(app);
 
 const $ = id => document.getElementById(id);
@@ -77,6 +81,7 @@ let resolving = false;
 let leavingRoom = false;
 let lastHostHeartbeatAt = 0;
 let claimingHost = false;
+const activeRoomStorageKey = uid => `mafia_active_room_${uid}`;
 
 /* -------------------- GENERAL UTILITIES -------------------- */
 
@@ -319,6 +324,24 @@ async function saveProfileDocument(displayName, avatarData) {
   });
 }
 
+async function loadMyStats() {
+  const snapshot = await getDoc(doc(db, "leaderboard", currentUser.uid));
+  renderMyStats(snapshot.exists() ? snapshot.data() : null);
+}
+
+function renderMyStats(stats) {
+  const games = Number(stats?.gamesPlayed || 0);
+  const wins = Number(stats?.wins || 0);
+  const rate = games ? Math.round((wins / games) * 100) : 0;
+  $("my-stat-games").textContent = String(games);
+  $("my-stat-wins").textContent = String(wins);
+  $("my-stat-rate").textContent = `${rate}%`;
+  $("my-stat-progress").style.width = `${rate}%`;
+  $("my-stat-role").textContent = stats?.mostPlayedRole || "—";
+  $("my-stat-streak").textContent = String(stats?.bestWinStreak || 0);
+  $("my-stat-alignment").textContent = stats?.mostPlayedAlignment || "—";
+}
+
 async function loadProfile() {
   const snapshot = await getDoc(doc(db, "users", currentUser.uid));
 
@@ -438,7 +461,10 @@ onAuthStateChanged(auth, async user => {
 
   try {
     await loadProfile();
-    showScreen(roomCode ? "game" : "home");
+    await loadMyStats();
+    const savedRoom = localStorage.getItem(activeRoomStorageKey(user.uid));
+    if (savedRoom) connectToRoom(savedRoom);
+    else showScreen("home");
   } catch (error) {
     showNotice(`Couldn't load your profile: ${friendlyError(error)}`, true);
     showScreen("home");
@@ -762,6 +788,7 @@ function connectToRoom(code) {
   disconnectRoomListeners();
 
   roomCode = code;
+  if (currentUser) localStorage.setItem(activeRoomStorageKey(currentUser.uid), code);
   room = null;
   players = [];
   privateByUid = {};
@@ -782,6 +809,7 @@ function connectToRoom(code) {
     if (!snapshot.exists()) {
       showNotice("This room no longer exists.", true);
       disconnectRoomListeners();
+      localStorage.removeItem(activeRoomStorageKey(currentUser.uid));
       roomCode = null;
       room = null;
       players = [];
@@ -816,6 +844,7 @@ function connectToRoom(code) {
     }
 
     renderGame();
+    if (room.phase === "finished") recordMyGameStats().catch(error => console.error("Stats update failed:", error));
     maintainHostLease();
     maybeResolvePhase();
   }, error => {
@@ -851,6 +880,7 @@ function connectToRoom(code) {
         }
 
         renderGame();
+        if (room?.phase === "finished") recordMyGameStats().catch(error => console.error("Stats update failed:", error));
       }
     }, error => {
       showNotice(`Couldn't load your role: ${friendlyError(error)}`, true);
@@ -2257,6 +2287,7 @@ async function leaveCurrentRoom(returnHome = true) {
     ]);
 
     disconnectRoomListeners();
+    localStorage.removeItem(activeRoomStorageKey(uid));
 
     roomCode = null;
     room = null;
