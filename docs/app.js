@@ -1251,12 +1251,23 @@ function renderPlayers() {
 function getCurrentActionType() {
   if (room?.phase === "voting") return "vote";
   if (room?.phase !== "night") return null;
+
+  const role = myRole();
+  if (
+    role === "Silencer" &&
+    !players.some(player =>
+      player.alive !== false && privateByUid[player.id]?.role === "Mafia"
+    )
+  ) {
+    return "kill";
+  }
+
   return ({
     Mafia: "kill",
     Silencer: "silence",
     Doctor: "protect",
     Detective: "investigate"
-  })[myRole()] || null;
+  })[role] || null;
 }
 
 function getActionCopy(type) {
@@ -1636,8 +1647,8 @@ async function submitAction(type, targetUid) {
 
   if (phase === "night") {
     const allowed = (
-      (type === "kill" && role === "Mafia") ||
-      (type === "silence" && role === "Silencer") ||
+      (type === "kill" && (role === "Mafia" || (role === "Silencer" && !players.some(player => player.alive !== false && privateByUid[player.id]?.role === "Mafia")))) ||
+      (type === "silence" && role === "Silencer" && players.some(player => player.alive !== false && privateByUid[player.id]?.role === "Mafia")) ||
       (type === "protect" && role === "Doctor") ||
       (type === "investigate" && role === "Detective")
     );
@@ -1872,7 +1883,7 @@ async function resolvePhase() {
 
       const mafiaVotes = nightActions.filter(action =>
         action.type === "kill" &&
-        privateByUid[action.uid]?.role === "Mafia" &&
+        ["Mafia", "Silencer"].includes(privateByUid[action.uid]?.role) &&
         players.some(player => player.id === action.uid && player.alive !== false) &&
         players.some(player => player.id === action.targetUid && player.alive !== false) &&
         !(privateByUid[action.uid]?.mafiaTeammates || []).includes(action.targetUid)
