@@ -805,13 +805,15 @@ function mostPlayedKey(map) {
 async function recordMyGameStats() {
   if (!currentUser || !roomCode || !room || room.phase !== "finished") return;
   const player = players.find(item => item.id === currentUser.uid);
-  const role = privateByUid[currentUser.uid]?.role;
-  if (!player || !role || !room.winner) return;
+  const privateData = privateByUid[currentUser.uid] || {};
+  const actualRole = privateData.role;
+  const role = privateData.roleStolen ? "Thief" : actualRole;
+  if (!player || !actualRole || !room.winner) return;
 
   const code = roomCode;
-  const alignment = alignmentForRole(role);
+  const alignment = alignmentForRole(actualRole);
   const won = room.winner === "Jester"
-    ? role === "Jester"
+    ? actualRole === "Jester"
     : room.winner === alignment && alignment !== "Neutral";
   const statsRef = doc(db, "leaderboard", currentUser.uid);
   const gameRef = doc(db, "leaderboard", currentUser.uid, "games", code);
@@ -944,6 +946,10 @@ async function loadLeaderboard() {
     list.textContent = `Couldn't load leaderboard: ${friendlyError(error)}`;
   }
 }
+
+$("final-results-home").addEventListener("click", () => {
+  leaveCurrentRoom(true);
+});
 
 $("statistics-button").addEventListener("click", openStatistics);
 $("statistics-back").addEventListener("click", closeStatistics);
@@ -1187,7 +1193,9 @@ function renderGame() {
 
   // Lobby and active-game layouts are separate.
   setVisible("lobby-layout", inLobby);
-  setVisible("game-grid", !inLobby);
+  setVisible("game-grid", !inLobby && phase !== "finished");
+  setVisible("final-results", phase === "finished");
+  if (phase === "finished") renderFinalResults();
 
   // Only the host gets tabs.
   setVisible("lobby-tabs", inLobby && host);
@@ -1339,13 +1347,15 @@ function renderGame() {
     $("team-info").textContent = "";
   }
 
-  $("winner-text").textContent = room.winner === "Mafia"
+  const winnerMessage = room.winner === "Mafia"
     ? "The Mafia win."
     : room.winner === "Town"
       ? "The Town wins."
       : room.winner === "Jester"
         ? "The Jester wins!"
         : "Game over";
+  $("winner-text").textContent = winnerMessage;
+  if ($("final-winner-heading")) $("final-winner-heading").textContent = winnerMessage;
 
   renderPlayers();
   renderTargetOptions();
@@ -1432,6 +1442,44 @@ document.addEventListener("keydown", event => {
     closeRoleGuide();
   }
 });
+
+function renderFinalResults() {
+  const list = $("final-player-roles");
+  if (!list) return;
+  list.replaceChildren();
+
+  players.forEach(player => {
+    const card = document.createElement("article");
+    card.className = "final-role-player";
+    const avatar = document.createElement("div");
+    avatar.className = "profile-avatar final-role-avatar";
+    renderAvatar(avatar, player.avatarData || "", player.name || "Player");
+
+    const details = document.createElement("div");
+    details.className = "final-role-details";
+    const name = document.createElement("strong");
+    name.className = "final-role-name";
+    name.textContent = player.name || "Player";
+    const role = document.createElement("span");
+    role.className = "final-role-nameplate";
+    role.textContent = player.roleReveal || "Role unavailable";
+    details.append(name, role);
+
+    if (player.originalRoleReveal === "Thief") {
+      const original = document.createElement("span");
+      original.className = "final-role-original";
+      original.textContent = "(originally Thief)";
+      details.append(original);
+    }
+
+    const status = document.createElement("span");
+    status.className = "final-role-status";
+    status.textContent = player.alive === false ? "Eliminated" : "Survived";
+    details.append(status);
+    card.append(avatar, details);
+    list.append(card);
+  });
+}
 
 function renderRoleRoster() {
   const roster = $("lobby-role-roster");
@@ -1954,7 +2002,8 @@ async function startGame() {
           ? mafiaUids.filter(uid => uid !== player.id)
           : [],
         thiefTokens: 0,
-        roleStolen: false
+        roleStolen: false,
+        originalRole: null
       });
 
       await updateDoc(playerRef(player.id), {
@@ -2198,6 +2247,14 @@ async function beginPhase(phase, seconds, round = room.round) {
 }
 
 async function finishGame(winner) {
+  await Promise.all(players.map(async player => {
+    const privateData = privateByUid[player.id] || {};
+    await updateDoc(playerRef(player.id), {
+      roleReveal: privateData.role || "Unknown",
+      originalRoleReveal: privateData.roleStolen ? "Thief" : null
+    });
+  }));
+
   await updateDoc(roomRef(), {
     phase: "finished",
     winner,
@@ -2348,6 +2405,7 @@ async function resolvePhase() {
             ...thiefData,
             role: inheritedRole,
             roleStolen: true,
+            originalRole: "Thief",
             inheritedFromUid: action.targetUid
           };
 
