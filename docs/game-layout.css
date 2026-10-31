@@ -661,3 +661,32 @@
   .role-info-card { padding: 20px 17px; }
   .role-info-card h2 { font-size: 22px; }
 }
+
+
+/* Player statistics and global leaderboard */
+.stats-panel { margin: 14px 0; }
+.stats-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stats-heading-row h2 { margin: 2px 0 8px; }
+.win-rate-block { margin: 12px 0 16px; }
+.win-rate-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; font-size: 13px; }
+.win-rate-label strong { font-size: 20px; }
+.win-rate-track { height: 10px; overflow: hidden; border-radius: 99px; background: var(--surface, rgba(127,127,127,.16)); }
+.win-rate-fill { width: 0; height: 100%; border-radius: inherit; background: var(--accent); transition: width .25s ease; }
+.stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.stats-grid > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 10px; border-radius: 10px; background: var(--surface, rgba(127,127,127,.08)); }
+.stats-grid strong { overflow: hidden; text-overflow: ellipsis; font-size: 17px; }
+.stats-grid span, .stats-footnote { color: var(--muted); font-size: 10px; }
+.stats-footnote { margin: 10px 0 0; }
+#leaderboard-panel { margin: 14px 0; }
+.leaderboard-list { display: grid; gap: 7px; margin-top: 12px; }
+.leaderboard-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--border, rgba(127,127,127,.2)); border-radius: 10px; }
+.leaderboard-rank { width: 32px; color: var(--accent); }
+.leaderboard-avatar { width: 36px; height: 36px; min-width: 36px; font-size: 12px; }
+.leaderboard-identity { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 2px; }
+.leaderboard-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.leaderboard-identity span { color: var(--muted); font-size: 10px; }
+.leaderboard-rate { font-size: 16px; }
+@media (max-width: 620px) {
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats-grid > div:first-child { grid-column: span 2; }
+}
