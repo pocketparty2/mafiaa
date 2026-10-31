@@ -139,7 +139,8 @@ service cloud.firestore {
     }
 
     match /rooms/{code} {
-      allow read: if isMember(code);
+      allow get: if signedIn() && (!exists(roomPath(code)) || isMember(code));
+      allow list: if isMember(code);
 
       allow create: if signedIn()
         && request.resource.data.hostUid == request.auth.uid
