@@ -1032,7 +1032,7 @@ function renderGame() {
 
   const roleCounts = getRoleCounts();
   let selectedRoleTotal = 0;
-  ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester"].forEach(role => {
+  ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Thief"].forEach(role => {
     const count = roleCounts[role];
     const input = $("role-count-" + role.toLowerCase());
     input.value = String(count);
@@ -1078,6 +1078,10 @@ function renderGame() {
       Jester: {
         description: "You win immediately if the Town eliminates you in the daytime vote. You have no night action.",
         team: "You win only by being eliminated by the daytime vote."
+      },
+      Thief: {
+        description: `Each night, steal tokens from one living player. Town gives 1, Mafia gives 2, and Neutral gives 3. You have ${privateByUid[currentUser.uid]?.thiefTokens || 0}/5 tokens. Once you reach 5, choose a deceased player and permanently become their role.`,
+        team: "You are Neutral. After stealing a role, you take on that role's win condition."
       },
       Townsperson: {
         description: "You have no special night action. Use discussion and voting to find the Mafia.",
@@ -1136,7 +1140,7 @@ function renderRoleRoster() {
   const alignments = [
     { name: "MAFIA", roles: [{ role: "Mafia", emoji: "🔪" }, { role: "Silencer", emoji: "🤫" }] },
     { name: "TOWN", roles: [{ role: "Detective", emoji: "🔎" }, { role: "Doctor", emoji: "🏥" }, { role: "Mayor", emoji: "⚖️" }, { role: "Townsperson", emoji: "🧍" }] },
-    { name: "NEUTRAL", roles: [{ role: "Jester", emoji: "🃏" }] }
+    { name: "NEUTRAL", roles: [{ role: "Jester", emoji: "🃏" }, { role: "Thief", emoji: "🪙" }] }
   ];
 
   roster.replaceChildren();
@@ -1262,6 +1266,16 @@ function getCurrentActionType() {
     return "kill";
   }
 
+  if (role === "Thief") {
+    const data = privateByUid[currentUser?.uid] || {};
+    const deadRoleTargets = players.filter(player =>
+      player.alive === false && privateByUid[player.id]?.role && privateByUid[player.id]?.role !== "Thief"
+    );
+    return (data.thiefTokens || 0) >= 5 && !data.roleStolen && deadRoleTargets.length
+      ? "stealRole"
+      : "steal";
+  }
+
   return ({
     Mafia: "kill",
     Silencer: "silence",
@@ -1306,6 +1320,20 @@ function getActionCopy(type) {
       hint: "Choose a player to investigate tonight, then lock it in.",
       button: "Lock in investigation",
       locked: "Your investigation is locked in."
+    },
+    steal: {
+      kind: "THIEF ACTION",
+      title: "Who will you steal from?",
+      hint: "Choose one living player. You secretly gain tokens based on their alignment.",
+      button: "Lock in theft",
+      locked: "Your theft is locked in."
+    },
+    stealRole: {
+      kind: "THIEF REWARD",
+      title: "Whose role will you take?",
+      hint: "Choose a deceased player. You will permanently replace your Thief role with theirs.",
+      button: "Steal role",
+      locked: "Your new role has been selected."
     }
   })[type] || {
     kind: "YOUR ACTION",
@@ -1320,6 +1348,14 @@ function getActionCandidates() {
   const role = myRole();
   const phase = room?.phase;
   const selfUid = currentUser?.uid;
+  if (phase === "night" && role === "Thief") {
+    if (getCurrentActionType() === "stealRole") {
+      return players.filter(player =>
+        player.alive === false && privateByUid[player.id]?.role && privateByUid[player.id]?.role !== "Thief"
+      );
+    }
+    return alivePlayers().filter(player => player.id !== selfUid);
+  }
   let candidates = alivePlayers();
 
   if (phase === "night" && ["Mafia", "Silencer"].includes(role)) {
@@ -1505,7 +1541,7 @@ $("reveal-check").addEventListener("change", async event => {
   }
 });
 
-const ROLE_NAMES = ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Townsperson"];
+const ROLE_NAMES = ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Thief", "Townsperson"];
 
 function getRoleCounts() {
   const saved = room?.settings?.roleCounts || {};
@@ -1515,7 +1551,8 @@ function getRoleCounts() {
     Detective: Number.isInteger(saved.Detective) ? saved.Detective : 0,
     Doctor: Number.isInteger(saved.Doctor) ? saved.Doctor : 0,
     Mayor: Number.isInteger(saved.Mayor) ? saved.Mayor : 0,
-    Jester: Number.isInteger(saved.Jester) ? saved.Jester : 0
+    Jester: Number.isInteger(saved.Jester) ? saved.Jester : 0,
+    Thief: Number.isInteger(saved.Thief) ? saved.Thief : 0
   };
   counts.Townsperson = Math.max(0, players.length - Object.values(counts).reduce((sum, count) => sum + count, 0));
   return counts;
@@ -1524,7 +1561,7 @@ function getRoleCounts() {
 async function saveRoleCounts() {
   if (!isHost() || room?.phase !== "lobby") return;
   const roleCounts = {};
-  for (const role of ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester"]) {
+  for (const role of ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Thief"]) {
     const input = $("role-count-" + role.toLowerCase());
     const value = Number(input?.value);
     if (!Number.isInteger(value) || value < 0 || value > MAX_PLAYERS) {
@@ -1598,7 +1635,9 @@ async function startGame() {
         investigationResult: "",
         mafiaTeammates: ["Mafia", "Silencer"].includes(role)
           ? mafiaUids.filter(uid => uid !== player.id)
-          : []
+          : [],
+        thiefTokens: 0,
+        roleStolen: false
       });
 
       await updateDoc(playerRef(player.id), {
@@ -1650,7 +1689,9 @@ async function submitAction(type, targetUid) {
       (type === "kill" && (role === "Mafia" || (role === "Silencer" && !players.some(player => player.alive !== false && privateByUid[player.id]?.role === "Mafia")))) ||
       (type === "silence" && role === "Silencer" && players.some(player => player.alive !== false && privateByUid[player.id]?.role === "Mafia")) ||
       (type === "protect" && role === "Doctor") ||
-      (type === "investigate" && role === "Detective")
+      (type === "investigate" && role === "Detective") ||
+      (type === "steal" && role === "Thief" && getCurrentActionType() === "steal") ||
+      (type === "stealRole" && role === "Thief" && getCurrentActionType() === "stealRole")
     );
 
     if (!allowed) {
@@ -1681,9 +1722,12 @@ async function submitAction(type, targetUid) {
   }
 
   const target = players.find(player => player.id === targetUid);
+  const stealingRole = phase === "night" && type === "stealRole";
 
-  if (!target || target.alive === false || targetUid === currentUser.uid) {
-    showNotice("Choose a living player other than yourself.", true);
+  if (!target || targetUid === currentUser.uid ||
+      (stealingRole && (target.alive !== false || !privateByUid[targetUid]?.role || privateByUid[targetUid]?.role === "Thief")) ||
+      (!stealingRole && target.alive === false)) {
+    showNotice(stealingRole ? "Choose a deceased player with an available role." : "Choose a living player other than yourself.", true);
     return;
   }
 
@@ -1739,7 +1783,7 @@ function requiredNightActors() {
     if (player.alive === false) return false;
 
     const role = privateByUid[player.id]?.role;
-    return ["Mafia", "Silencer", "Doctor", "Detective"].includes(role);
+    return ["Mafia", "Silencer", "Doctor", "Detective", "Thief"].includes(role);
   });
 }
 
@@ -1910,6 +1954,13 @@ async function resolvePhase() {
         players.some(player => player.id === action.targetUid && player.alive !== false)
       );
 
+      const thiefActions = nightActions.filter(action =>
+        ["steal", "stealRole"].includes(action.type) &&
+        privateByUid[action.uid]?.role === "Thief" &&
+        !privateByUid[action.uid]?.roleStolen &&
+        players.some(player => player.id === action.uid && player.alive !== false)
+      );
+
       let killedUid = null;
 
       if (mafiaVotes.length) {
@@ -1952,6 +2003,58 @@ async function resolvePhase() {
           ...(privateByUid[action.targetUid] || {}),
           silencedRound: round
         });
+      }
+
+      for (const action of thiefActions) {
+        const thiefData = privateByUid[action.uid] || {};
+        if (action.type === "steal") {
+          const targetRole = privateByUid[action.targetUid]?.role;
+          if (!targetRole) continue;
+          const tokens = ["Mafia", "Silencer"].includes(targetRole)
+            ? 2
+            : ["Jester", "Thief"].includes(targetRole)
+              ? 3
+              : 1;
+          const updated = { ...thiefData, thiefTokens: (thiefData.thiefTokens || 0) + tokens };
+          await setDoc(privateRef(action.uid), updated);
+          privateByUid[action.uid] = updated;
+        } else if (
+          action.type === "stealRole" &&
+          (thiefData.thiefTokens || 0) >= 5 &&
+          !thiefData.roleStolen &&
+          players.some(player => player.id === action.targetUid && player.alive === false)
+        ) {
+          const inheritedRole = privateByUid[action.targetUid]?.role;
+          if (!inheritedRole || inheritedRole === "Thief") continue;
+
+          const updatedThief = {
+            ...thiefData,
+            role: inheritedRole,
+            roleStolen: true,
+            inheritedFromUid: action.targetUid
+          };
+
+          if (["Mafia", "Silencer"].includes(inheritedRole)) {
+            const teammates = players.filter(player =>
+              player.id !== action.uid && player.alive !== false &&
+              ["Mafia", "Silencer"].includes(privateByUid[player.id]?.role)
+            ).map(player => player.id);
+            updatedThief.mafiaTeammates = teammates;
+            for (const teammateUid of teammates) {
+              const teammateData = privateByUid[teammateUid] || {};
+              const updatedTeammate = {
+                ...teammateData,
+                mafiaTeammates: [...new Set([...(teammateData.mafiaTeammates || []), action.uid])]
+              };
+              await setDoc(privateRef(teammateUid), updatedTeammate);
+              privateByUid[teammateUid] = updatedTeammate;
+            }
+          }
+
+          await setDoc(privateRef(action.uid), updatedThief);
+          privateByUid[action.uid] = updatedThief;
+          showNotice("A Thief has permanently stolen a new role!");
+        }
       }
 
       const winner = await checkWinner();
