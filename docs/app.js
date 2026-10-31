@@ -1132,6 +1132,82 @@ function renderGame() {
   }
 }
 
+const ROLE_GUIDE = {
+  Mafia: {
+    alignment: "Mafia",
+    ability: "Each night, the Mafia collectively choose one living player to eliminate. Mafia members cannot target their own teammates.",
+    win: "The Mafia win when the number of living Mafia members equals or exceeds the number of living Town members.",
+    notes: "You work with the other Mafia members. Your goal is to outnumber the Town."
+  },
+  Silencer: {
+    alignment: "Mafia",
+    ability: "Each night, choose one living player to silence. That player cannot vote during the following daytime vote. If no ordinary Mafia members remain alive, the Silencer takes over the Mafia's nightly elimination.",
+    win: "The Mafia win when the number of living Mafia members equals or exceeds the number of living Town members.",
+    notes: "You are part of the Mafia team and can see your fellow Mafia teammates."
+  },
+  Detective: {
+    alignment: "Town",
+    ability: "Each night, investigate one living player to learn whether they are Mafia.",
+    win: "Help the Town eliminate every Mafia member.",
+    notes: "Your investigation result is private to you."
+  },
+  Doctor: {
+    alignment: "Town",
+    ability: "Each night, protect one living player from the Mafia's attack. A successful protection prevents that night's elimination.",
+    win: "Help the Town eliminate every Mafia member."
+  },
+  Mayor: {
+    alignment: "Town",
+    ability: "Your vote during the daytime elimination vote counts twice.",
+    win: "Help the Town eliminate every Mafia member."
+  },
+  Townsperson: {
+    alignment: "Town",
+    ability: "You have no special night action. Take part in discussion and vote during the day to identify and eliminate the Mafia.",
+    win: "The Town wins when every Mafia member has been eliminated."
+  },
+  Jester: {
+    alignment: "Neutral",
+    ability: "You have no night action. Your aim is to get the Town to eliminate you in the daytime vote.",
+    win: "You win immediately if you are eliminated by the daytime vote. Being eliminated at night does not trigger your win."
+  },
+  Thief: {
+    alignment: "Neutral",
+    ability: "Each night, choose one living player to steal from. Stealing from a Town player earns 1 token, a Mafia player earns 2 tokens, and a Neutral player earns 3 tokens. Once you have at least 5 tokens, you can choose a deceased player and permanently take their role and abilities. Your Thief role is replaced and you cannot steal tokens or change roles again.",
+    win: "While you are the Thief, you are Neutral and have no separate team win condition. After taking a role, you adopt that role's alignment and win condition.",
+    notes: "Your token total is private. The role you inherit is permanent."
+  }
+};
+
+function showRoleGuide(role) {
+  const info = ROLE_GUIDE[role];
+  if (!info) return;
+
+  const modal = $("role-info-modal");
+  $("role-info-title").textContent = role;
+  $("role-info-alignment").textContent = info.alignment + " alignment";
+  $("role-info-ability").textContent = info.ability;
+  $("role-info-win").textContent = info.win;
+  $("role-info-notes").textContent = info.notes || "";
+  setVisible("role-info-notes-row", Boolean(info.notes));
+  setVisible("role-info-modal", true);
+  $("role-info-close").focus();
+}
+
+function closeRoleGuide() {
+  setVisible("role-info-modal", false);
+}
+
+$("role-info-close").addEventListener("click", closeRoleGuide);
+$("role-info-modal").addEventListener("click", event => {
+  if (event.target === $("role-info-modal")) closeRoleGuide();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && !$("role-info-modal").classList.contains("hidden")) {
+    closeRoleGuide();
+  }
+});
+
 function renderRoleRoster() {
   const roster = $("lobby-role-roster");
   if (!roster) return;
@@ -1156,9 +1232,12 @@ function renderRoleRoster() {
     alignment.roles.forEach(({ role, emoji }) => {
       const count = counts[role] || 0;
       if (count < 1) return;
-      const item = document.createElement("span");
+      const item = document.createElement("button");
+      item.type = "button";
       item.className = "lobby-role-item";
       item.textContent = `${emoji} ${role} ×${count}`;
+      item.setAttribute("aria-label", `View ${role} role information`);
+      item.addEventListener("click", () => showRoleGuide(role));
       group.append(item);
     });
 
