@@ -378,3 +378,12 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+
+/* Host role-count controls */
+#role-count-settings { display: grid; grid-template-columns: minmax(0, 1fr) 64px; align-items: center; gap: 6px 10px; margin: 6px 0; }
+#role-count-settings label { font-size: 12px; }
+#role-count-settings input { min-height: 32px; padding: 5px 7px; text-align: center; font-size: 13px; }
+.role-count-heading { margin: 10px 0 4px; color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: 1.5px; }
+.role-count-summary { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.2; }
+#lobby-settings-panel #start-game { margin-top: 8px; }
