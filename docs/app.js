@@ -60,6 +60,8 @@ let players = [];
 let privateByUid = {};
 let actionsByUid = {};
 let myAction = null;
+let selectedTargetUid = null;
+let selectionPhaseKey = null;
 let activeLobbyTab = "settings";
 
 let unsubRoom = null;
@@ -1222,52 +1224,134 @@ function renderPlayers() {
   });
 }
 
-function renderTargetOptions() {
-  const select = $("target-select");
-  if (!select) return;
+function getCurrentActionType() {
+  if (room?.phase === "voting") return "vote";
+  if (room?.phase !== "night") return null;
+  return ({
+    Mafia: "kill",
+    Doctor: "protect",
+    Detective: "investigate"
+  })[myRole()] || null;
+}
 
-  const previous = select.value;
-  select.replaceChildren();
+function getActionCopy(type) {
+  return ({
+    vote: {
+      kind: "DAYTIME VOTE",
+      title: "Who should be eliminated?",
+      hint: "Choose the player you suspect, then lock in your vote.",
+      button: "Lock in vote",
+      locked: "Your vote is locked in."
+    },
+    kill: {
+      kind: "MAFIA ACTION",
+      title: "Choose your target",
+      hint: "Select who the Mafia should target tonight, then lock it in.",
+      button: "Lock in target",
+      locked: "Your target is locked in."
+    },
+    protect: {
+      kind: "DOCTOR ACTION",
+      title: "Who will you protect?",
+      hint: "Choose a player to protect tonight, then lock it in.",
+      button: "Lock in protection",
+      locked: "Your protection is locked in."
+    },
+    investigate: {
+      kind: "DETECTIVE ACTION",
+      title: "Who will you investigate?",
+      hint: "Choose a player to investigate tonight, then lock it in.",
+      button: "Lock in investigation",
+      locked: "Your investigation is locked in."
+    }
+  })[type] || {
+    kind: "YOUR ACTION",
+    title: "Choose a player",
+    hint: "Select a player, then lock in your choice.",
+    button: "Lock in choice",
+    locked: "Your action is locked in."
+  };
+}
 
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "Choose a player...";
-  select.append(placeholder);
-
+function getActionCandidates() {
   const role = myRole();
   const phase = room?.phase;
   const selfUid = currentUser?.uid;
-
   let candidates = alivePlayers();
 
-  if (phase === "night") {
-    if (role === "Mafia") {
-      const teammates = privateByUid[selfUid]?.mafiaTeammates || [];
-
-      candidates = candidates.filter(player =>
-        player.id !== selfUid &&
-        !teammates.includes(player.id)
-      );
-    } else if (role === "Detective" || role === "Doctor") {
-      candidates = candidates.filter(player => player.id !== selfUid);
-    } else {
-      candidates = [];
-    }
-  } else if (phase === "voting") {
+  if (phase === "night" && role === "Mafia") {
+    const teammates = privateByUid[selfUid]?.mafiaTeammates || [];
+    candidates = candidates.filter(player =>
+      player.id !== selfUid && !teammates.includes(player.id)
+    );
+  } else if (
+    (phase === "night" && ["Detective", "Doctor"].includes(role)) ||
+    phase === "voting"
+  ) {
     candidates = candidates.filter(player => player.id !== selfUid);
   } else {
     candidates = [];
   }
 
+  return candidates;
+}
+
+function renderTargetOptions() {
+  const grid = $("action-player-grid");
+  if (!grid) return;
+
+  const phaseKey = `${room?.phase}-${room?.round}`;
+  if (selectionPhaseKey !== phaseKey) {
+    selectionPhaseKey = phaseKey;
+    selectedTargetUid = null;
+  }
+
+  const candidates = getActionCandidates();
+  if (!candidates.some(player => player.id === selectedTargetUid)) {
+    selectedTargetUid = null;
+  }
+
+  grid.replaceChildren();
+
   candidates.forEach(player => {
-    const option = document.createElement("option");
-    option.value = player.id;
-    option.textContent = player.name || "Player";
-    select.append(option);
+    const selected = player.id === selectedTargetUid;
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "action-player-card";
+    card.classList.toggle("is-selected", selected);
+    card.setAttribute("aria-pressed", String(selected));
+    card.disabled = Boolean(
+      myAction &&
+      myAction.phase === room?.phase &&
+      myAction.round === room?.round
+    );
+
+    const avatar = document.createElement("div");
+    avatar.className = "profile-avatar action-player-avatar";
+    renderAvatar(avatar, player.avatarData || "", player.name || "Player");
+
+    const name = document.createElement("strong");
+    name.className = "action-player-name";
+    name.textContent = player.name || "Player";
+
+    const marker = document.createElement("span");
+    marker.className = "action-player-marker";
+    marker.textContent = selected ? "✓ Selected" : "Select";
+
+    card.append(avatar, name, marker);
+    card.addEventListener("click", () => {
+      selectedTargetUid = player.id;
+      renderTargetOptions();
+      renderActionControls();
+    });
+    grid.append(card);
   });
 
-  if ([...select.options].some(option => option.value === previous)) {
-    select.value = previous;
+  if (!candidates.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted action-empty";
+    empty.textContent = "There are no eligible players to choose.";
+    grid.append(empty);
   }
 }
 
@@ -1276,50 +1360,38 @@ function renderActionControls() {
   const role = myRole();
   const self = me();
   const alive = self?.alive !== false;
-
+  const type = getCurrentActionType();
   const currentAction = myAction &&
     myAction.phase === phase &&
     myAction.round === room?.round
       ? myAction
       : null;
+  const eligible = alive && Boolean(type);
+  const copy = getActionCopy(type);
 
-  const nightEligible = phase === "night" &&
-    alive &&
-    ["Mafia", "Doctor", "Detective"].includes(role);
+  $("action-kind").textContent = copy.kind;
+  $("action-selection-title").textContent = copy.title;
+  $("action-selection-hint").textContent = copy.hint;
+  $("lock-action").textContent = copy.button;
+  $("lock-action").disabled =
+    !eligible || Boolean(currentAction) || !selectedTargetUid ||
+    !getActionCandidates().some(player => player.id === selectedTargetUid);
 
-  setVisible("night-buttons", nightEligible);
-  setVisible("submit-vote", phase === "voting" && alive);
-
-  $("night-buttons").querySelectorAll("button").forEach(button => {
-    const actionType = button.dataset.action;
-
-    const allowed = (
-      (role === "Mafia" && actionType === "kill") ||
-      (role === "Doctor" && actionType === "protect") ||
-      (role === "Detective" && actionType === "investigate")
-    );
-
-    button.classList.toggle("hidden", !allowed);
-    button.disabled = Boolean(currentAction) || !allowed;
+  $("action-player-grid").classList.toggle("has-locked-action", Boolean(currentAction));
+  $("action-player-grid").querySelectorAll(".action-player-card").forEach(card => {
+    card.disabled = !eligible || Boolean(currentAction);
   });
 
-  $("submit-vote").disabled =
-    Boolean(currentAction) || phase !== "voting" || !alive;
-
-  $("target-select").disabled =
-    (!nightEligible && phase !== "voting") || Boolean(currentAction);
-
   if (currentAction) {
-    $("action-status").textContent = phase === "voting"
-      ? "Your vote has been submitted."
-      : "Your night action has been submitted.";
-  } else if (!alive && phase !== "lobby" && phase !== "finished") {
+    $("action-status").textContent = copy.locked;
+  } else if (!alive && !["lobby", "finished"].includes(phase)) {
     $("action-status").textContent =
       "You've been eliminated. You can watch, but you can't act.";
-  } else if (phase === "night" && !nightEligible) {
+  } else if (phase === "night" && !eligible) {
     $("action-status").textContent = "Your role has no action tonight.";
   } else {
-    $("action-status").textContent = "";
+    $("action-status").textContent =
+      eligible ? "Your action only counts once you lock it in. No lock-in by the end of the timer means you abstain." : "";
   }
 }
 
@@ -1508,22 +1580,16 @@ async function startGame() {
 
 /* -------------------- NIGHT ACTIONS AND VOTING -------------------- */
 
-$("night-buttons").addEventListener("click", async event => {
-  const button = event.target.closest("button[data-action]");
-  if (!button) return;
-
-  await submitAction(button.dataset.action);
+$("lock-action").addEventListener("click", async () => {
+  const type = getCurrentActionType();
+  if (!type || !selectedTargetUid) return;
+  await submitAction(type, selectedTargetUid);
 });
 
-$("submit-vote").addEventListener("click", async () => {
-  await submitAction("vote");
-});
-
-async function submitAction(type) {
+async function submitAction(type, targetUid) {
   if (!roomCode || !room || !currentUser) return;
 
   const role = myRole();
-  const targetUid = $("target-select").value;
   const phase = room.phase;
 
   if (phase === "night") {
@@ -1581,7 +1647,8 @@ async function submitAction(type) {
       updatedAt: serverTimestamp()
     });
 
-    showNotice(type === "vote" ? "Vote submitted." : "Night action submitted.");
+    selectedTargetUid = null;
+    showNotice(type === "vote" ? "Vote locked in." : "Action locked in.");
   } catch (error) {
     showNotice(`Couldn't submit action: ${friendlyError(error)}`, true);
   }
