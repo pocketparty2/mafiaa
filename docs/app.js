@@ -732,6 +732,7 @@ $("join-form").addEventListener("submit", async event => {
   }
 
   const button = $("join-form").querySelector('button[type="submit"]');
+  let joinStage = "reading room";
 
   try {
     button.disabled = true;
@@ -756,12 +757,14 @@ $("join-form").addEventListener("submit", async event => {
     }
 
     if (!alreadyMember) {
+      joinStage = "adding you to the room";
       await updateDoc(ref, {
         memberUids: arrayUnion(currentUser.uid),
         updatedAt: serverTimestamp()
       });
     }
 
+    joinStage = "creating your player entry";
     await setDoc(playerRef(currentUser.uid, code), {
       uid: currentUser.uid,
       name: getDisplayName(),
@@ -772,11 +775,12 @@ $("join-form").addEventListener("submit", async event => {
       joinedAt: serverTimestamp()
     });
 
+    joinStage = "opening the room";
     connectToRoom(code);
     showNotice(`Joined room ${code}!`);
   } catch (error) {
-    console.error("Join room failed:", error);
-    showNotice(`Couldn't join room (${error?.code || "unknown error"}): ${friendlyError(error)}`, true);
+    console.error("Join room failed during " + joinStage + ":", error);
+    showNotice(`Couldn't join room while ${joinStage} (${error?.code || "unknown error"}): ${friendlyError(error)}`, true);
   } finally {
     button.disabled = false;
   }
