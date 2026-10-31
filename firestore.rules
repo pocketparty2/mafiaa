@@ -184,7 +184,7 @@ service cloud.firestore {
           || (
             signedIn()
             && request.auth.uid == playerUid
-            && request.auth.uid in getAfter(roomPath(code)).data.memberUids
+            && isMember(code)
           );
 
         allow update: if isHost(code)
