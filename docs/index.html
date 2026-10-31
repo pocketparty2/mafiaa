@@ -374,25 +374,16 @@
           </div>
 
           <div id="action-controls" class="stack hidden">
-            <label for="target-select">Choose a player</label>
-            <select id="target-select"></select>
-
-            <div id="night-buttons" class="button-row hidden">
-              <button data-action="kill" class="button danger" type="button">
-                Choose victim
-              </button>
-
-              <button data-action="investigate" class="button primary" type="button">
-                Investigate
-              </button>
-
-              <button data-action="protect" class="button" type="button">
-                Protect
-              </button>
+            <div class="action-prompt">
+              <p class="eyebrow" id="action-kind">YOUR ACTION</p>
+              <h3 id="action-selection-title">Choose a player</h3>
+              <p id="action-selection-hint" class="muted">Select a player, then lock in your choice.</p>
             </div>
 
-            <button id="submit-vote" class="button primary hidden" type="button">
-              Cast vote
+            <div id="action-player-grid" class="action-player-grid" aria-label="Choose a player"></div>
+
+            <button id="lock-action" class="button primary action-lock-button" type="button" disabled>
+              Lock in choice
             </button>
 
             <p id="action-status" class="muted"></p>
