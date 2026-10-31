@@ -73,6 +73,8 @@ let hostListenersCode = null;
 let timerHandle = null;
 let resolving = false;
 let leavingRoom = false;
+let lastHostHeartbeatAt = 0;
+let claimingHost = false;
 
 /* -------------------- GENERAL UTILITIES -------------------- */
 
@@ -749,6 +751,9 @@ function disconnectRoomListeners() {
     clearInterval(timerHandle);
     timerHandle = null;
   }
+
+  lastHostHeartbeatAt = 0;
+  claimingHost = false;
 }
 
 function connectToRoom(code) {
@@ -762,6 +767,8 @@ function connectToRoom(code) {
   myAction = null;
   resolving = false;
   leavingRoom = false;
+  lastHostHeartbeatAt = 0;
+  claimingHost = false;
   activeLobbyTab = "settings";
 
   $("room-code-display").textContent = code;
@@ -807,6 +814,7 @@ function connectToRoom(code) {
     }
 
     renderGame();
+    maintainHostLease();
     maybeResolvePhase();
   }, error => {
     showNotice(`Room listener failed: ${friendlyError(error)}`, true);
@@ -858,8 +866,52 @@ function connectToRoom(code) {
 
   timerHandle = setInterval(() => {
     renderTimer();
+    maintainHostLease();
     maybeResolvePhase();
   }, 1000);
+}
+
+async function maintainHostLease() {
+  if (!room || !currentUser || !roomCode || room.phase === "finished") return;
+
+  if (isHost()) {
+    if (Date.now() - lastHostHeartbeatAt < 10000) return;
+
+    lastHostHeartbeatAt = Date.now();
+    updateDoc(roomRef(), {
+      hostHeartbeatAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }).catch(error => {
+      console.warn("Host heartbeat failed:", error);
+    });
+    return;
+  }
+
+  if (claimingHost) return;
+
+  const heartbeat = room.hostHeartbeatAt || room.createdAt;
+  const heartbeatMs = typeof heartbeat?.toMillis === "function"
+    ? heartbeat.toMillis()
+    : Number(heartbeat || 0);
+
+  if (!heartbeatMs || Date.now() - heartbeatMs < 30000) return;
+
+  claimingHost = true;
+
+  try {
+    await updateDoc(roomRef(), {
+      hostUid: currentUser.uid,
+      hostHeartbeatAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    showNotice("The host was inactive, so you've taken over the room.");
+  } catch (error) {
+    if (error?.code !== "permission-denied") {
+      console.warn("Host handover failed:", error);
+    }
+  } finally {
+    claimingHost = false;
+  }
 }
 
 function attachHostListeners(code) {
@@ -1143,9 +1195,11 @@ function renderTargetOptions() {
 
   if (phase === "night") {
     if (role === "Mafia") {
+      const teammates = privateByUid[selfUid]?.mafiaTeammates || [];
+
       candidates = candidates.filter(player =>
         player.id !== selfUid &&
-        privateByUid[player.id]?.role !== "Mafia"
+        !teammates.includes(player.id)
       );
     } else if (role === "Detective" || role === "Doctor") {
       candidates = candidates.filter(player => player.id !== selfUid);
@@ -1349,6 +1403,7 @@ async function startGame() {
       round: 1,
       winner: null,
       endsAt: timestampAfter(NIGHT_SECONDS),
+      hostHeartbeatAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
 
@@ -1584,6 +1639,19 @@ async function resolvePhase() {
   resolving = true;
 
   try {
+    const latestSnapshot = await getDoc(roomRef());
+    if (!latestSnapshot.exists()) return;
+
+    const latestRoom = latestSnapshot.data();
+    if (
+      latestRoom.hostUid !== currentUser.uid ||
+      latestRoom.phase !== phase ||
+      latestRoom.round !== round
+    ) {
+      return;
+    }
+
+    room = latestRoom;
     if (phase === "discussion") {
       await beginPhase("voting", VOTING_SECONDS, round);
       return;
@@ -1595,19 +1663,23 @@ async function resolvePhase() {
       const mafiaVotes = nightActions.filter(action =>
         action.type === "kill" &&
         privateByUid[action.uid]?.role === "Mafia" &&
-        players.some(player =>
-          player.id === action.targetUid && player.alive !== false
-        )
+        players.some(player => player.id === action.uid && player.alive !== false) &&
+        players.some(player => player.id === action.targetUid && player.alive !== false) &&
+        !(privateByUid[action.uid]?.mafiaTeammates || []).includes(action.targetUid)
       );
 
       const doctorActions = nightActions.filter(action =>
         action.type === "protect" &&
-        privateByUid[action.uid]?.role === "Doctor"
+        privateByUid[action.uid]?.role === "Doctor" &&
+        players.some(player => player.id === action.uid && player.alive !== false) &&
+        players.some(player => player.id === action.targetUid && player.alive !== false)
       );
 
       const detectiveActions = nightActions.filter(action =>
         action.type === "investigate" &&
-        privateByUid[action.uid]?.role === "Detective"
+        privateByUid[action.uid]?.role === "Detective" &&
+        players.some(player => player.id === action.uid && player.alive !== false) &&
+        players.some(player => player.id === action.targetUid && player.alive !== false)
       );
 
       let killedUid = null;
