@@ -1001,6 +1001,7 @@ function connectToRoom(code) {
     if (!currentUser || !(room.memberUids || []).includes(currentUser.uid)) {
       showNotice("You've left this room.");
       disconnectRoomListeners();
+      if (currentUser) localStorage.removeItem(activeRoomStorageKey(currentUser.uid));
       roomCode = null;
       room = null;
       players = [];
