@@ -360,6 +360,27 @@
           <div id="lobby-role-roster" class="lobby-role-roster"></div>
         </section>
 
+        <div id="role-info-modal" class="role-info-modal hidden" role="dialog" aria-modal="true" aria-labelledby="role-info-title">
+          <section class="role-info-card">
+            <button id="role-info-close" class="button subtle role-info-close" type="button" aria-label="Close role information">×</button>
+            <p class="eyebrow">ROLE GUIDE</p>
+            <h2 id="role-info-title">Role</h2>
+            <p id="role-info-alignment" class="role-info-alignment"></p>
+            <div class="role-info-section">
+              <h3>What you do</h3>
+              <p id="role-info-ability"></p>
+            </div>
+            <div class="role-info-section">
+              <h3>Win condition</h3>
+              <p id="role-info-win"></p>
+            </div>
+            <div id="role-info-notes-row" class="role-info-section">
+              <h3>Additional information</h3>
+              <p id="role-info-notes"></p>
+            </div>
+          </section>
+        </div>
+
         <!-- READY BUTTON FOR EVERYONE -->
         <section id="lobby-controls" class="panel lobby-ready-panel">
           <label class="toggle-row ready-toggle">
