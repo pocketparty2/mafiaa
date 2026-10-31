@@ -708,7 +708,8 @@ $("create-form").addEventListener("submit", async event => {
     connectToRoom(createdCode);
     showNotice(`Room ${createdCode} created! Share the code with your friends.`);
   } catch (error) {
-    showNotice(`Couldn't create room: ${friendlyError(error)}`, true);
+    console.error("Room creation failed:", error);
+    showNotice(`Couldn't create room (${error?.code || "unknown error"}): ${friendlyError(error)}`, true);
   } finally {
     const button = $("create-form").querySelector('button[type="submit"]');
     button.disabled = false;
