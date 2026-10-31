@@ -802,3 +802,23 @@
   #game-screen #lobby-role-panel { order: 3; flex: 0 0 auto; }
   #game-screen #lobby-controls { order: 4; flex: 0 0 auto; }
 }
+
+
+/* Final role reveal */
+#game-screen .final-results { margin-top: 12px; }
+#game-screen .final-results-heading { text-align: center; margin-bottom: 16px; }
+#game-screen .final-results-heading h2 { margin: 4px 0; font-size: clamp(22px, 4vw, 30px); }
+#game-screen .final-results-heading > p:last-child { color: var(--muted, #aaa); margin: 5px 0 0; font-size: 13px; }
+#game-screen .final-player-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 9px; margin-bottom: 16px; }
+#game-screen .final-role-player { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px; border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 12px; background: var(--surface, rgba(255,255,255,.035)); }
+#game-screen .final-role-avatar { width: 42px; height: 42px; min-width: 42px; }
+#game-screen .final-role-details { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+#game-screen .final-role-name { overflow-wrap: anywhere; font-size: 13px; }
+#game-screen .final-role-nameplate { font-size: 12px; font-weight: 700; }
+#game-screen .final-role-original, #game-screen .final-role-status { color: var(--muted, #aaa); font-size: 10px; }
+#game-screen #final-results-home { display: block; margin: 0 auto; min-width: 150px; }
+@media (max-width: 520px) {
+  #game-screen .final-player-roles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  #game-screen .final-role-player { padding: 8px 6px; gap: 7px; }
+  #game-screen .final-role-avatar { width: 34px; height: 34px; min-width: 34px; }
+}
