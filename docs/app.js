@@ -1030,18 +1030,18 @@ function renderGame() {
 
   const roleCounts = getRoleCounts();
   let selectedRoleTotal = 0;
-  Object.entries(roleCounts).forEach(([role, count]) => {
+  ["Mafia", "Detective", "Doctor"].forEach(role => {
+    const count = roleCounts[role];
     const input = $("role-count-" + role.toLowerCase());
-    if (input) {
-      input.value = String(count);
-      input.disabled = !host || !inLobby;
-    }
+    input.value = String(count);
+    input.disabled = !host || !inLobby;
     selectedRoleTotal += count;
   });
-  $("role-count-summary").textContent = selectedRoleTotal + " of " + players.length + " players assigned";
-  const roleCountsValid = Object.values(roleCounts).every(count =>
+  $("role-count-townsperson").textContent = String(roleCounts.Townsperson);
+  $("role-count-summary").textContent = roleCounts.Townsperson + " Townsperson" + (roleCounts.Townsperson === 1 ? "" : "s") + " will be assigned automatically.";
+  const roleCountsValid = Object.entries(roleCounts).every(([role, count]) =>
     Number.isInteger(count) && count >= 0 && count <= MAX_PLAYERS
-  ) && selectedRoleTotal === players.length;
+  ) && selectedRoleTotal <= players.length;
 
   setVisible("start-game", inLobby && host);
   $("start-game").disabled =
@@ -1360,18 +1360,19 @@ const ROLE_NAMES = ["Mafia", "Detective", "Doctor", "Townsperson"];
 
 function getRoleCounts() {
   const saved = room?.settings?.roleCounts || {};
-  return {
+  const counts = {
     Mafia: Number.isInteger(saved.Mafia) ? saved.Mafia : 1,
     Detective: Number.isInteger(saved.Detective) ? saved.Detective : 0,
-    Doctor: Number.isInteger(saved.Doctor) ? saved.Doctor : 0,
-    Townsperson: Number.isInteger(saved.Townsperson) ? saved.Townsperson : 0
+    Doctor: Number.isInteger(saved.Doctor) ? saved.Doctor : 0
   };
+  counts.Townsperson = Math.max(0, players.length - Object.values(counts).reduce((sum, count) => sum + count, 0));
+  return counts;
 }
 
 async function saveRoleCounts() {
   if (!isHost() || room?.phase !== "lobby") return;
   const roleCounts = {};
-  for (const role of ROLE_NAMES) {
+  for (const role of ["Mafia", "Detective", "Doctor"]) {
     const input = $("role-count-" + role.toLowerCase());
     const value = Number(input?.value);
     if (!Number.isInteger(value) || value < 0 || value > MAX_PLAYERS) {
@@ -1416,8 +1417,8 @@ async function startGame() {
 
     const roleCounts = getRoleCounts();
     const selectedRoleTotal = Object.values(roleCounts).reduce((total, count) => total + count, 0);
-    if (Object.values(roleCounts).some(count => !Number.isInteger(count) || count < 0 || count > MAX_PLAYERS) || selectedRoleTotal !== players.length) {
-      throw new Error("Set the role counts to exactly match the number of players.");
+    if (Object.values(roleCounts).some(count => !Number.isInteger(count) || count < 0 || count > MAX_PLAYERS) || selectedRoleTotal > players.length) {
+      throw new Error("The selected special roles cannot exceed the number of players.");
     }
 
     const rolePool = [];
