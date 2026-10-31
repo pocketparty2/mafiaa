@@ -390,3 +390,29 @@
 
 #role-count-settings .role-count-label { font-size: 12px; }
 #role-count-settings .role-count-auto { text-align: center; font-size: 13px; }
+
+
+/* Public role composition in the lobby Players section */
+.lobby-role-roster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 10px;
+  flex: 0 0 auto;
+  margin-top: 7px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: var(--surface, rgba(127, 127, 127, 0.1));
+  font-size: 11px;
+  line-height: 1.2;
+}
+.lobby-role-item {
+  white-space: nowrap;
+  font-weight: 650;
+}
+#role-count-settings label {
+  font-size: 12px;
+}
+#lobby-players-panel #lobby-player-list {
+  margin-top: 7px;
+}
