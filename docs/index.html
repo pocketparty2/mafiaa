@@ -112,27 +112,10 @@
       </div>
 
       <div id="home-content">
-      <section id="my-stats-panel" class="subpanel stats-panel">
-        <div class="stats-heading-row">
-          <div><p class="eyebrow">YOUR RECORD</p><h2>Your statistics</h2></div>
-          <button id="leaderboard-button" class="button" type="button">Leaderboard</button>
-        </div>
-        <div class="win-rate-block">
-          <div class="win-rate-label"><span>Win rate</span><strong id="my-stat-rate">0%</strong></div>
-          <div class="win-rate-track"><div id="my-stat-progress" class="win-rate-fill"></div></div>
-        </div>
-        <div class="stats-grid">
-          <div><strong id="my-stat-games">0</strong><span>Games played</span></div>
-          <div><strong id="my-stat-wins">0</strong><span>Wins</span></div>
-          <div><strong id="my-stat-role">—</strong><span>Most played role</span></div>
-          <div><strong id="my-stat-alignment">—</strong><span>Most played alignment</span></div>
-          <div><strong id="my-stat-streak">0</strong><span>Best win streak</span></div>
-        </div>
-        <div class="stats-breakdowns">
-          <div><h3>Wins by role</h3><div id="my-role-breakdown" class="breakdown-list">No completed games yet.</div></div>
-          <div><h3>Wins by alignment</h3><div id="my-alignment-breakdown" class="breakdown-list">No completed games yet.</div></div>
-        </div>
-      </section>
+      <div class="button-row home-navigation">
+        <button id="statistics-button" class="button" type="button">Your statistics</button>
+        <button id="leaderboard-button" class="button" type="button">Global leaderboard</button>
+      </div>
 
       <!-- PROFILE EDITOR -->
       <div id="profile-editor" class="subpanel stack hidden">
@@ -267,7 +250,36 @@
         </form>
       </div>
       </div>
-      <section id="leaderboard-panel" class="subpanel hidden">
+
+
+    
+
+    <section id="statistics-screen" class="panel hidden">
+      <section id="my-stats-panel" class="subpanel stats-panel">
+        <div class="stats-heading-row">
+          <div><p class="eyebrow">YOUR RECORD</p><h2>Your statistics</h2></div>
+          <button id="statistics-back" class="button subtle" type="button">Back</button>
+        </div>
+        <div class="win-rate-block">
+          <div class="win-rate-label"><span>Win rate</span><strong id="my-stat-rate">0%</strong></div>
+          <div class="win-rate-track"><div id="my-stat-progress" class="win-rate-fill"></div></div>
+        </div>
+        <div class="stats-grid">
+          <div><strong id="my-stat-games">0</strong><span>Games played</span></div>
+          <div><strong id="my-stat-wins">0</strong><span>Wins</span></div>
+          <div><strong id="my-stat-role">—</strong><span>Most played role</span></div>
+          <div><strong id="my-stat-alignment">—</strong><span>Most played alignment</span></div>
+          <div><strong id="my-stat-streak">0</strong><span>Best win streak</span></div>
+        </div>
+        <div class="stats-breakdowns">
+          <div><h3>Wins by role</h3><div id="my-role-breakdown" class="breakdown-list">No completed games yet.</div></div>
+          <div><h3>Wins by alignment</h3><div id="my-alignment-breakdown" class="breakdown-list">No completed games yet.</div></div>
+        </div>
+      </section>
+    </section>
+
+    <section id="leaderboard-screen" class="panel hidden">
+      <section id="leaderboard-panel" class="subpanel">
         <div class="stats-heading-row">
           <div><p class="eyebrow">GLOBAL RANKINGS</p><h2>Leaderboard</h2></div>
           <button id="leaderboard-back" class="button subtle" type="button">Back</button>
@@ -277,8 +289,7 @@
       </section>
     </section>
 
-    
-    <!-- GAME -->
+        <!-- GAME -->
     <section id="game-screen" class="hidden">
 
       <div class="room-heading">
