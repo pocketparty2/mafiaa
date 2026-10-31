@@ -1393,7 +1393,7 @@ async function saveRoleCounts() {
   }
 }
 
-ROLE_NAMES.forEach(role => {
+["Mafia", "Detective", "Doctor"].forEach(role => {
   $("role-count-" + role.toLowerCase()).addEventListener("change", saveRoleCounts);
 });
 
