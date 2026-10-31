@@ -1042,7 +1042,8 @@ function renderGame() {
   renderRoleRoster();
   const roleCountsValid = Object.entries(roleCounts).every(([role, count]) =>
     Number.isInteger(count) && count >= 0 && count <= MAX_PLAYERS
-  ) && selectedRoleTotal <= players.length;
+  ) && selectedRoleTotal <= players.length &&
+    !(roleCounts.Silencer > 0 && roleCounts.Mafia < 1);
 
   setVisible("start-game", inLobby && host);
   $("start-game").disabled =
