@@ -1890,6 +1890,19 @@ async function saveRoleCounts() {
   $("role-count-" + role.toLowerCase()).addEventListener("change", saveRoleCounts);
 });
 
+// Mobile-friendly +/- controls for host role counts.
+$("role-count-settings").addEventListener("click", event => {
+  const button = event.target.closest("[data-role-step]");
+  if (!button || button.disabled) return;
+  const input = $("role-count-" + button.dataset.roleStep);
+  if (!input || input.disabled) return;
+  const current = Number(input.value || 0);
+  const next = Math.max(0, Math.min(MAX_PLAYERS, current + Number(button.dataset.step)));
+  input.value = String(next);
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+});
+
+
 $("start-game").addEventListener("click", startGame);
 
 async function startGame() {
