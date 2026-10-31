@@ -416,3 +416,55 @@
 #lobby-players-panel #lobby-player-list {
   margin-top: 7px;
 }
+
+
+/* Persistent role summary, visible on both lobby tabs */
+#game-screen #lobby-role-panel {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.22));
+  border-radius: 12px;
+}
+#game-screen #lobby-role-panel .eyebrow {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+#game-screen .lobby-role-roster {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+#game-screen .lobby-role-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.2));
+  border-radius: 999px;
+  background: var(--panel, rgba(127, 127, 127, 0.08));
+  font-size: 10px;
+  line-height: 1;
+}
+@media (max-width: 520px) {
+  #game-screen #lobby-role-panel {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+  #game-screen .lobby-role-roster {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
