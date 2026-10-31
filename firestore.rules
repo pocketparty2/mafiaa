@@ -139,7 +139,7 @@ service cloud.firestore {
     }
 
     match /rooms/{code} {
-      allow get: if signedIn() && (!exists(roomPath(code)) || isMember(code));
+      allow get: if signedIn() && (resource == null || isMember(code));
       allow list: if isMember(code);
 
       allow create: if signedIn()
