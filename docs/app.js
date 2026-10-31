@@ -340,6 +340,29 @@ function renderMyStats(stats) {
   $("my-stat-role").textContent = stats?.mostPlayedRole || "—";
   $("my-stat-streak").textContent = String(stats?.bestWinStreak || 0);
   $("my-stat-alignment").textContent = stats?.mostPlayedAlignment || "—";
+  renderBreakdown($("my-role-breakdown"), stats?.roleGames, stats?.roleWins);
+  renderBreakdown($("my-alignment-breakdown"), stats?.alignmentGames, stats?.alignmentWins);
+}
+
+function renderBreakdown(container, gamesMap, winsMap) {
+  if (!container) return;
+  container.replaceChildren();
+  const entries = Object.entries(gamesMap || {}).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) {
+    container.textContent = "No completed games yet.";
+    return;
+  }
+  entries.forEach(([name, games]) => {
+    const wins = Number(winsMap?.[name] || 0);
+    const row = document.createElement("div");
+    row.className = "breakdown-row";
+    const label = document.createElement("span");
+    label.textContent = name;
+    const record = document.createElement("strong");
+    record.textContent = `${wins}/${games} wins · ${games ? Math.round(wins / games * 100) : 0}%`;
+    row.append(label, record);
+    container.append(row);
+  });
 }
 
 async function loadProfile() {
@@ -461,7 +484,7 @@ onAuthStateChanged(auth, async user => {
 
   try {
     await loadProfile();
-    await loadMyStats();
+    await loadMyStats().catch(error => console.warn("Statistics are unavailable until Firestore rules are published:", error));
     const savedRoom = localStorage.getItem(activeRoomStorageKey(user.uid));
     if (savedRoom) connectToRoom(savedRoom);
     else showScreen("home");
@@ -884,7 +907,26 @@ async function loadLeaderboard() {
       rate.className = "leaderboard-rate";
       rate.textContent = `${Math.round(Number(entry.winRate || 0) * 100)}%`;
       row.append(rank, avatar, identity, rate);
-      list.append(row);
+      const breakdown = document.createElement("details");
+      breakdown.className = "leaderboard-breakdown";
+      const summary = document.createElement("summary");
+      summary.textContent = "View role and alignment record";
+      breakdown.append(summary);
+      const roleHeading = document.createElement("strong");
+      roleHeading.textContent = "By role";
+      const roleRows = document.createElement("div");
+      roleRows.className = "breakdown-list";
+      renderBreakdown(roleRows, entry.roleGames, entry.roleWins);
+      const alignmentHeading = document.createElement("strong");
+      alignmentHeading.textContent = "By alignment";
+      const alignmentRows = document.createElement("div");
+      alignmentRows.className = "breakdown-list";
+      renderBreakdown(alignmentRows, entry.alignmentGames, entry.alignmentWins);
+      breakdown.append(roleHeading, roleRows, alignmentHeading, alignmentRows);
+      const wrapper = document.createElement("div");
+      wrapper.className = "leaderboard-entry";
+      wrapper.append(row, breakdown);
+      list.append(wrapper);
     });
   } catch (error) {
     list.textContent = `Couldn't load leaderboard: ${friendlyError(error)}`;
@@ -1095,6 +1137,7 @@ function attachHostListeners(code) {
     });
 
     renderGame();
+    if (room?.phase === "finished") recordMyGameStats().catch(error => console.error("Stats update failed:", error));
     maybeResolvePhase();
   }, error => {
     showNotice(`Host role listener failed: ${friendlyError(error)}`, true);
