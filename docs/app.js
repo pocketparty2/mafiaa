@@ -126,6 +126,8 @@ function setVisible(id, visible) {
 function showScreen(screen) {
   setVisible("auth-screen", screen === "auth");
   setVisible("home-screen", screen === "home");
+  setVisible("statistics-screen", screen === "statistics");
+  setVisible("leaderboard-screen", screen === "leaderboard");
   setVisible("game-screen", screen === "game");
   setVisible("signout", Boolean(currentUser));
 }
@@ -856,15 +858,21 @@ async function recordMyGameStats() {
   await loadMyStats();
 }
 
+function openStatistics() {
+  showScreen("statistics");
+}
+
+function closeStatistics() {
+  showScreen("home");
+}
+
 function openLeaderboard() {
-  setVisible("home-content", false);
-  setVisible("leaderboard-panel", true);
+  showScreen("leaderboard");
   loadLeaderboard();
 }
 
 function closeLeaderboard() {
-  setVisible("leaderboard-panel", false);
-  setVisible("home-content", true);
+  showScreen("home");
 }
 
 async function loadLeaderboard() {
@@ -933,6 +941,8 @@ async function loadLeaderboard() {
   }
 }
 
+$("statistics-button").addEventListener("click", openStatistics);
+$("statistics-back").addEventListener("click", closeStatistics);
 $("leaderboard-button").addEventListener("click", openLeaderboard);
 $("leaderboard-back").addEventListener("click", closeLeaderboard);
 
