@@ -22,6 +22,80 @@ service cloud.firestore {
         && get(roomPath(code)).data.hostUid == request.auth.uid;
     }
 
+    function hostLeaseExpired(code) {
+      let data = get(roomPath(code)).data;
+      return (
+        'hostHeartbeatAt' in data
+        && data.hostHeartbeatAt is timestamp
+        && data.hostHeartbeatAt < request.time - duration.value(30, 's')
+      ) || (
+        !('hostHeartbeatAt' in data)
+        && 'createdAt' in data
+        && data.createdAt < request.time - duration.value(30, 's')
+      );
+    }
+
+    function canClaimHost(code) {
+      return signedIn()
+        && request.auth.uid in resource.data.memberUids
+        && hostLeaseExpired(code)
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.hostHeartbeatAt == request.time
+        && request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly(['hostUid', 'hostHeartbeatAt', 'updatedAt']);
+    }
+
+    function validAction(code, playerUid) {
+      let roomData = get(roomPath(code)).data;
+      let actorPath = /databases/$(database)/documents/rooms/$(code)/players/$(playerUid);
+      let targetPath = /databases/$(database)/documents/rooms/$(code)/players/$(request.resource.data.targetUid);
+      let actorPrivatePath = /databases/$(database)/documents/rooms/$(code)/private/$(playerUid);
+      let targetPrivatePath = /databases/$(database)/documents/rooms/$(code)/private/$(request.resource.data.targetUid);
+
+      return request.resource.data.keys().hasOnly([
+          'uid', 'type', 'targetUid', 'phase', 'round', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'type', 'targetUid', 'phase', 'round', 'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.targetUid is string
+        && request.resource.data.targetUid != playerUid
+        && request.resource.data.phase == roomData.phase
+        && request.resource.data.round == roomData.round
+        && request.resource.data.updatedAt == request.time
+        && exists(actorPath)
+        && get(actorPath).data.alive == true
+        && exists(targetPath)
+        && get(targetPath).data.alive == true
+        && (
+          (
+            request.resource.data.phase == 'night'
+            && exists(actorPrivatePath)
+            && exists(targetPrivatePath)
+            && (
+              (
+                request.resource.data.type == 'kill'
+                && get(actorPrivatePath).data.role == 'Mafia'
+                && get(targetPrivatePath).data.role != 'Mafia'
+              )
+              || (
+                request.resource.data.type == 'protect'
+                && get(actorPrivatePath).data.role == 'Doctor'
+              )
+              || (
+                request.resource.data.type == 'investigate'
+                && get(actorPrivatePath).data.role == 'Detective'
+              )
+            )
+          )
+          || (
+            request.resource.data.phase == 'voting'
+            && request.resource.data.type == 'vote'
+          )
+        );
+    }
+
     match /users/{userId} {
       allow read: if signedIn()
         && request.auth.uid == userId;
@@ -53,10 +127,8 @@ service cloud.firestore {
         && request.resource.data.phase == 'lobby';
 
       allow update: if
-        // Current host can manage the room.
         isHost(code)
-
-        // A new player can join a lobby.
+        || canClaimHost(code)
         || (
           signedIn()
           && resource.data.phase == 'lobby'
@@ -68,8 +140,6 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data)
             .affectedKeys().hasOnly(['memberUids', 'updatedAt'])
         )
-
-        // An existing player can leave.
         || (
           signedIn()
           && request.auth.uid in resource.data.memberUids
@@ -126,15 +196,14 @@ service cloud.firestore {
             || isHost(code)
           );
 
-        allow create, update: if signedIn()
+        allow create: if signedIn()
           && request.auth.uid == playerUid
-          && isMember(code);
+          && isMember(code)
+          && validAction(code, playerUid);
 
-        allow delete: if isHost(code)
-          || (
-            signedIn()
-            && request.auth.uid == playerUid
-          );
+        allow update: if false;
+
+        allow delete: if isHost(code);
       }
     }
 
