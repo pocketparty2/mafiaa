@@ -624,7 +624,7 @@ $("create-form").addEventListener("submit", async event => {
             memberUids: [currentUser.uid],
             phase: "lobby",
             round: 0,
-            settings: { revealRoles: true },
+            settings: { revealRoles: true, roleCounts: { Mafia: 1, Detective: 0, Doctor: 0, Townsperson: 0 } },
             winner: null,
             endsAt: null,
             createdAt: serverTimestamp(),
@@ -1028,12 +1028,28 @@ function renderGame() {
   $("reveal-check").checked = room.settings?.revealRoles !== false;
   $("reveal-check").disabled = !host || !inLobby;
 
+  const roleCounts = getRoleCounts();
+  let selectedRoleTotal = 0;
+  Object.entries(roleCounts).forEach(([role, count]) => {
+    const input = $("role-count-" + role.toLowerCase());
+    if (input) {
+      input.value = String(count);
+      input.disabled = !host || !inLobby;
+    }
+    selectedRoleTotal += count;
+  });
+  $("role-count-summary").textContent = selectedRoleTotal + " of " + players.length + " players assigned";
+  const roleCountsValid = Object.values(roleCounts).every(count =>
+    Number.isInteger(count) && count >= 0 && count <= MAX_PLAYERS
+  ) && selectedRoleTotal === players.length;
+
   setVisible("start-game", inLobby && host);
   $("start-game").disabled =
     !host ||
     players.length < MIN_PLAYERS ||
     players.length > MAX_PLAYERS ||
-    !players.every(player => player.ready);
+    !players.every(player => player.ready) ||
+    !roleCountsValid;
 
   if (role) {
     const roleInfo = {
@@ -1340,6 +1356,46 @@ $("reveal-check").addEventListener("change", async event => {
   }
 });
 
+const ROLE_NAMES = ["Mafia", "Detective", "Doctor", "Townsperson"];
+
+function getRoleCounts() {
+  const saved = room?.settings?.roleCounts || {};
+  return {
+    Mafia: Number.isInteger(saved.Mafia) ? saved.Mafia : 1,
+    Detective: Number.isInteger(saved.Detective) ? saved.Detective : 0,
+    Doctor: Number.isInteger(saved.Doctor) ? saved.Doctor : 0,
+    Townsperson: Number.isInteger(saved.Townsperson) ? saved.Townsperson : 0
+  };
+}
+
+async function saveRoleCounts() {
+  if (!isHost() || room?.phase !== "lobby") return;
+  const roleCounts = {};
+  for (const role of ROLE_NAMES) {
+    const input = $("role-count-" + role.toLowerCase());
+    const value = Number(input?.value);
+    if (!Number.isInteger(value) || value < 0 || value > MAX_PLAYERS) {
+      showNotice("Role counts must be whole numbers from 0 to 12.", true);
+      renderGame();
+      return;
+    }
+    roleCounts[role] = value;
+  }
+  try {
+    await updateDoc(roomRef(), {
+      settings: { ...(room.settings || {}), roleCounts },
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    showNotice(friendlyError(error), true);
+    renderGame();
+  }
+}
+
+ROLE_NAMES.forEach(role => {
+  $("role-count-" + role.toLowerCase()).addEventListener("change", saveRoleCounts);
+});
+
 $("start-game").addEventListener("click", startGame);
 
 async function startGame() {
@@ -1358,17 +1414,20 @@ async function startGame() {
   try {
     $("start-game").disabled = true;
 
-    const shuffledPlayers = shuffle(players);
-    const mafiaCount = Math.max(1, Math.floor(players.length / 4));
+    const roleCounts = getRoleCounts();
+    const selectedRoleTotal = Object.values(roleCounts).reduce((total, count) => total + count, 0);
+    if (Object.values(roleCounts).some(count => !Number.isInteger(count) || count < 0 || count > MAX_PLAYERS) || selectedRoleTotal !== players.length) {
+      throw new Error("Set the role counts to exactly match the number of players.");
+    }
 
-    const roleAssignments = new Map();
-
-    shuffledPlayers.forEach((player, index) => {
-      if (index < mafiaCount) roleAssignments.set(player.id, "Mafia");
-      else if (index === mafiaCount) roleAssignments.set(player.id, "Detective");
-      else if (index === mafiaCount + 1) roleAssignments.set(player.id, "Doctor");
-      else roleAssignments.set(player.id, "Townsperson");
+    const rolePool = [];
+    ROLE_NAMES.forEach(role => {
+      for (let count = 0; count < roleCounts[role]; count++) rolePool.push(role);
     });
+    const shuffledPlayers = shuffle(players);
+    const shuffledRoles = shuffle(rolePool);
+    const roleAssignments = new Map();
+    shuffledPlayers.forEach((player, index) => roleAssignments.set(player.id, shuffledRoles[index]));
 
     const mafiaUids = [...roleAssignments.entries()]
       .filter(([, role]) => role === "Mafia")
