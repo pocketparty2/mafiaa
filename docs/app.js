@@ -624,7 +624,7 @@ $("create-form").addEventListener("submit", async event => {
             memberUids: [currentUser.uid],
             phase: "lobby",
             round: 0,
-            settings: { revealRoles: true, roleCounts: { Mafia: 1, Detective: 0, Doctor: 0, Townsperson: 0 } },
+            settings: { revealRoles: true, roleCounts: { Mafia: 1, Detective: 0, Doctor: 0 } },
             winner: null,
             endsAt: null,
             createdAt: serverTimestamp(),
@@ -1037,8 +1037,7 @@ function renderGame() {
     input.disabled = !host || !inLobby;
     selectedRoleTotal += count;
   });
-  $("role-count-townsperson").textContent = String(roleCounts.Townsperson);
-  $("role-count-summary").textContent = roleCounts.Townsperson + " Townsperson" + (roleCounts.Townsperson === 1 ? "" : "s") + " will be assigned automatically.";
+  renderRoleRoster();
   const roleCountsValid = Object.entries(roleCounts).every(([role, count]) =>
     Number.isInteger(count) && count >= 0 && count <= MAX_PLAYERS
   ) && selectedRoleTotal <= players.length;
@@ -1109,6 +1108,38 @@ function renderGame() {
 
   if (phase === "lobby") {
     $("action-status").textContent = "";
+  }
+}
+
+function renderRoleRoster() {
+  const roster = $("lobby-role-roster");
+  if (!roster) return;
+
+  const counts = getRoleCounts();
+  const roleDetails = [
+    { role: "Mafia", emoji: "🔪" },
+    { role: "Detective", emoji: "🔎" },
+    { role: "Doctor", emoji: "🏥" },
+    { role: "Townsperson", emoji: "🧍" }
+  ];
+
+  roster.replaceChildren();
+
+  roleDetails.forEach(({ role, emoji }) => {
+    const count = counts[role] || 0;
+    if (count < 1) return;
+
+    const item = document.createElement("span");
+    item.className = "lobby-role-item";
+    item.textContent = `${emoji} ${role} ×${count}`;
+    roster.append(item);
+  });
+
+  if (!roster.childElementCount) {
+    const empty = document.createElement("span");
+    empty.className = "muted";
+    empty.textContent = "No roles configured yet.";
+    roster.append(empty);
   }
 }
 
