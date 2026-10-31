@@ -387,3 +387,6 @@
 .role-count-heading { margin: 10px 0 4px; color: var(--accent); font-size: 9px; font-weight: 800; letter-spacing: 1.5px; }
 .role-count-summary { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.2; }
 #lobby-settings-panel #start-game { margin-top: 8px; }
+
+#role-count-settings .role-count-label { font-size: 12px; }
+#role-count-settings .role-count-auto { text-align: center; font-size: 13px; }
