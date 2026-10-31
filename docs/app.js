@@ -9,7 +9,7 @@ import {
   signOut,
   updateEmail,
   updatePassword,
-  reauthenticateWithCredential,
+  reauthenticateWithCredential, 
   EmailAuthProvider
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {
