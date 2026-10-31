@@ -776,7 +776,7 @@ $("join-form").addEventListener("submit", async event => {
     showNotice(`Joined room ${code}!`);
   } catch (error) {
     console.error("Join room failed:", error);
-    showNotice(`Couldn't join room: ${friendlyError(error)}`, true);
+    showNotice(`Couldn't join room (${error?.code || "unknown error"}): ${friendlyError(error)}`, true);
   } finally {
     button.disabled = false;
   }
