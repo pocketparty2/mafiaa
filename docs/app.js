@@ -1255,7 +1255,7 @@ function renderGame() {
       : `Round ${room.round || 1}`;
 
   setVisible("lobby-controls", inLobby);
-  setVisible("action-controls", phase === "night" || phase === "voting" || (phase === "discussion" && role === "Knight"));
+  setVisible("action-controls", phase === "night" || phase === "voting" || (phase === "discussion" && role === "Knight" && !privateByUid[currentUser.uid]?.knightChallengeUsed));
   setVisible("finished-card", phase === "finished");
   setVisible("role-card", Boolean(role) && !inLobby);
 
@@ -1272,7 +1272,7 @@ function renderGame() {
   let selectedRoleTotal = 0;
   ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter"].forEach(role => {
     const count = roleCounts[role];
-    const input = $("role-count-" + role.toLowerCase());
+    const input = $(roleCountInputId(role));
     input.value = String(count);
     input.disabled = !host || !inLobby;
     selectedRoleTotal += count;
@@ -2000,6 +2000,10 @@ $("reveal-check").addEventListener("change", async event => {
 
 const ROLE_NAMES = ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter", "Townsperson"];
 
+function roleCountInputId(role) {
+  return "role-count-" + role.toLowerCase().replace(/\s+/g, "-");
+}
+
 function getRoleCounts() {
   const saved = room?.settings?.roleCounts || {};
   const counts = {
@@ -2022,7 +2026,7 @@ async function saveRoleCounts() {
   if (!isHost() || room?.phase !== "lobby") return;
   const roleCounts = {};
   for (const role of ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter"]) {
-    const input = $("role-count-" + role.toLowerCase());
+    const input = $(roleCountInputId(role));
     const value = Number(input?.value);
     if (!Number.isInteger(value) || value < 0 || value > MAX_PLAYERS) {
       showNotice("Role counts must be whole numbers from 0 to 12.", true);
@@ -2043,7 +2047,7 @@ async function saveRoleCounts() {
 }
 
 ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter"].forEach(role => {
-  $("role-count-" + role.toLowerCase()).addEventListener("change", saveRoleCounts);
+  $(roleCountInputId(role)).addEventListener("change", saveRoleCounts);
 });
 
 // Mobile-friendly +/- controls for host role counts.
@@ -2072,7 +2076,7 @@ $("role-preset-select").addEventListener("change", async event => {
   if (!counts) return;
 
   for (const [role, count] of Object.entries(counts)) {
-    const input = $("role-count-" + role.toLowerCase());
+    const input = $(roleCountInputId(role));
     if (input) input.value = String(count);
   }
   await saveRoleCounts();
@@ -2423,6 +2427,9 @@ async function beginPhase(phase, seconds, round = room.round) {
   await updateDoc(roomRef(), {
     phase,
     round,
+    discussionPaused: false,
+    pausedSecondsRemaining: null,
+    ...(phase === "discussion" ? { challengeNotice: null } : {}),
     ...(phase === "voting"
       ? { voteStage: "initial", tiedPlayerUids: [] }
       : { voteStage: null, tiedPlayerUids: [] }),
