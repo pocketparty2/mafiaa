@@ -6,7 +6,7 @@ export const ACHIEVEMENTS = [
   { id: "untouchable", category: "Winning", name: "Untouchable", requirement: "Win 50 rounds", title: "Untouchable", colors: ["#941e4f", "#6b0f35"], kind: "wins", target: 50 },
   { id: "mastermind", category: "Winning", name: "Mastermind", requirement: "Win 100 rounds", title: "Mastermind", colors: ["#bd0606", "#9c3232"], kind: "wins", target: 100 },
   { id: "power-in-numbers", category: "Role", name: "Power in Numbers", requirement: "Win as a Townsperson", title: "Honest Citizen", colors: ["#2ECC71", "#117864"], kind: "role", role: "Townsperson" },
-  { id: "case-closed", category: "Role", name: "Case Closed", requirement: "Win as a Detective", title: "Sleuthing", colors: ["#2980B9", "#1B2A4A"], kind: "role", role: "Detective" },
+  { id: "case-closed", category: "Role", name: "Case Closed", requirement: "Win as a Detective", title: "Sleuthing", colors: ["#2980B9", "#1B2A4A"], kind: "role", role: "Detective" }, 
   { id: "mourning-does-the-body-no-good", category: "Role", name: "Mourning Does The Body No Good", requirement: "Win as Mafia", title: "Caporegime", colors: ["#E74C3C", "#640000"], kind: "role", role: "Mafia" },
   { id: "do-no-harm", category: "Role", name: "Do No Harm", requirement: "Win as a Doctor", title: "Lifesaver", colors: ["#00F2FE", "#4FACFE"], kind: "role", role: "Doctor" },
   { id: "executive-order", category: "Role", name: "Executive Order", requirement: "Win as a Mayor", title: "Honorable", colors: ["#FFE000", "#799F0C"], kind: "role", role: "Mayor" },
