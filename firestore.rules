@@ -67,7 +67,14 @@ service cloud.firestore {
         && exists(actorPath)
         && get(actorPath).data.alive == true
         && exists(targetPath)
-        && get(targetPath).data.alive == true
+        && (
+          get(targetPath).data.alive == true
+          || (
+            request.resource.data.phase == 'night'
+            && request.resource.data.type == 'stealRole'
+            && get(targetPath).data.alive == false
+          )
+        )
         && (
           (
             request.resource.data.phase == 'night'
