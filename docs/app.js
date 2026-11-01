@@ -2298,8 +2298,16 @@ async function startGame() {
 
       await setDoc(privateRef(player.id), {
         role,
+        startingRole: role,
         investigationResult: "",
         trackerResult: "",
+        incorrectVotes: 0,
+        clutchSaves: 0,
+        silenceStreakTargetUid: null,
+        silenceStreakCount: 0,
+        muzzled: false,
+        sherlocksIntuition: false,
+        fatalDiscovery: false,
         bountyTargetUid: bountyTarget?.id || null,
         knightChallengeUsed: false,
         mafiaTeammates: ["Mafia", "Silencer"].includes(role)
@@ -2313,7 +2321,12 @@ async function startGame() {
       await updateDoc(playerRef(player.id), {
         ready: false,
         alive: true,
-        roleReveal: null
+        roleReveal: null,
+        eliminationMethod: null,
+        eliminatedRound: null,
+        eliminatedPhase: null,
+        unanimousVote: false,
+        fatalDiscovery: false
       });
     });
 
@@ -2570,10 +2583,14 @@ async function revealEliminatedPlayer(uid) {
   const roleReveal = room.settings?.revealRoles === false
     ? null
     : (privateByUid[uid]?.role || null);
+  const eliminationMethod = room.phase === "voting" ? "vote" : room.phase === "night" ? "night" : "challenge";
   await updateDoc(playerRef(uid), {
     alive: false,
     ready: false,
-    roleReveal
+    roleReveal,
+    eliminationMethod,
+    eliminatedRound: room.round,
+    eliminatedPhase: room.phase
   });
   players = players.map(item => item.id === uid
     ? { ...item, alive: false, ready: false, roleReveal }
@@ -2625,6 +2642,12 @@ async function finishGame(winner, bountyHunterWinnerUids = []) {
       originalRole: privateData.roleStolen ? "Thief" : null,
       alignment,
       alive: player.alive !== false,
+      eliminationMethod: player.eliminationMethod || null,
+      eliminatedRound: player.eliminatedRound ?? null,
+      eliminatedPhase: player.eliminatedPhase || null,
+      unanimousVote: player.unanimousVote === true,
+      fatalDiscovery: player.fatalDiscovery === true || privateData.fatalDiscovery === true,
+      startingRole: privateData.startingRole || role,
       won
     };
   });
@@ -2707,7 +2730,10 @@ async function resolvePhase() {
       await updateDoc(playerRef(eliminatedUid), {
         alive: false,
         ready: false,
-        roleReveal: challengeSucceeded ? challengedRole : "Knight"
+        roleReveal: challengeSucceeded ? challengedRole : "Knight",
+        eliminationMethod: "challenge",
+        eliminatedRound: round,
+        eliminatedPhase: "discussion"
       });
       players = players.map(player => player.id === eliminatedUid
         ? { ...player, alive: false, roleReveal: challengeSucceeded ? challengedRole : "Knight" }
@@ -2814,6 +2840,26 @@ async function resolvePhase() {
         doctorActions.map(action => action.targetUid)
       );
 
+      if (killedUid && protectedUids.has(killedUid)) {
+        for (const action of doctorActions.filter(item => item.targetUid === killedUid)) {
+          const doctorData = privateByUid[action.uid] || {};
+          const updatedDoctor = { ...doctorData, clutchSaves: Number(doctorData.clutchSaves || 0) + 1 };
+          await setDoc(privateRef(action.uid), updatedDoctor);
+          privateByUid[action.uid] = updatedDoctor;
+        }
+      }
+
+      const fatalDetectives = detectiveActions.filter(action =>
+        action.uid === killedUid && privateByUid[action.targetUid]?.role === "Mafia"
+      );
+      for (const action of fatalDetectives) {
+        const detectiveData = { ...(privateByUid[action.uid] || {}), fatalDiscovery: true };
+        await setDoc(privateRef(action.uid), detectiveData);
+        privateByUid[action.uid] = detectiveData;
+        await updateDoc(playerRef(action.uid), { fatalDiscovery: true });
+        players = players.map(player => player.id === action.uid ? { ...player, fatalDiscovery: true } : player);
+      }
+
       if (killedUid && !protectedUids.has(killedUid)) {
         await revealEliminatedPlayer(killedUid);
       }
@@ -2824,10 +2870,13 @@ async function resolvePhase() {
           ? `${playerName(action.targetUid)} is Mafia.`
           : `${playerName(action.targetUid)} is not Mafia.`;
 
-        await setDoc(privateRef(action.uid), {
+        const detectiveData = {
           ...privateByUid[action.uid],
-          investigationResult: result
-        });
+          investigationResult: result,
+          ...(round === 1 && targetRole === "Mafia" ? { sherlocksIntuition: true } : {})
+        };
+        await setDoc(privateRef(action.uid), detectiveData);
+        privateByUid[action.uid] = detectiveData;
       }
 
       for (const action of trackerActions) {
@@ -2848,6 +2897,18 @@ async function resolvePhase() {
           ...(privateByUid[action.targetUid] || {}),
           silencedRound: round
         });
+        const silencerData = privateByUid[action.uid] || {};
+        const streak = silencerData.silenceStreakTargetUid === action.targetUid
+          ? Number(silencerData.silenceStreakCount || 0) + 1
+          : 1;
+        const updatedSilencer = {
+          ...silencerData,
+          silenceStreakTargetUid: action.targetUid,
+          silenceStreakCount: streak,
+          muzzled: streak >= 3
+        };
+        await setDoc(privateRef(action.uid), updatedSilencer);
+        privateByUid[action.uid] = updatedSilencer;
       }
 
       for (const action of thiefActions) {
