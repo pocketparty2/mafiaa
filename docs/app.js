@@ -128,6 +128,7 @@ function showScreen(screen) {
   setVisible("auth-screen", screen === "auth");
   setVisible("home-screen", screen === "home");
   setVisible("statistics-screen", screen === "statistics");
+  setVisible("achievements-screen", screen === "achievements");
   setVisible("leaderboard-screen", screen === "leaderboard");
   setVisible("game-screen", screen === "game");
   setVisible("signout", Boolean(currentUser));
@@ -1049,6 +1050,16 @@ function closeStatistics() {
   showScreen("home");
 }
 
+function openAchievements() {
+  showScreen("achievements");
+  renderAchievements(myStats);
+  renderTitleSelector(myStats);
+}
+
+function closeAchievements() {
+  showScreen("home");
+}
+
 function openLeaderboard() {
   showScreen("leaderboard");
   loadLeaderboard();
@@ -1130,6 +1141,8 @@ $("final-results-home").addEventListener("click", () => {
 });
 
 $("statistics-button").addEventListener("click", openStatistics);
+$("achievements-button").addEventListener("click", openAchievements);
+$("achievements-back").addEventListener("click", closeAchievements);
 $("active-title-select").addEventListener("change", event => {
   saveActiveTitle(event.target.value).catch(error => showNotice(friendlyError(error), true));
 });
