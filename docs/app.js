@@ -1567,8 +1567,19 @@ function renderRoleRoster() {
   const counts = getRoleCounts();
   const alignments = [
     { name: "MAFIA", roles: [{ role: "Mafia", emoji: "🔪" }, { role: "Silencer", emoji: "🤫" }] },
-    { name: "TOWN", roles: [{ role: "Detective", emoji: "🔎" }, { role: "Doctor", emoji: "🏥" }, { role: "Mayor", emoji: "⚖️" }, { role: "Townsperson", emoji: "🧍" }] },
-    { name: "NEUTRAL", roles: [{ role: "Jester", emoji: "🃏" }, { role: "Thief", emoji: "🪙" }] }
+    { name: "TOWN", roles: [
+      { role: "Detective", emoji: "🔎" },
+      { role: "Doctor", emoji: "🏥" },
+      { role: "Mayor", emoji: "⚖️" },
+      { role: "Tracker", emoji: "👣" },
+      { role: "Knight", emoji: "⚔️" },
+      { role: "Townsperson", emoji: "🧍" }
+    ] },
+    { name: "NEUTRAL", roles: [
+      { role: "Jester", emoji: "🃏" },
+      { role: "Thief", emoji: "🪙" },
+      { role: "Bounty Hunter", emoji: "🎯" }
+    ] }
   ];
 
   roster.replaceChildren();
