@@ -2547,7 +2547,9 @@ $("role-preset-select").addEventListener("change", async event => {
 
   const presets = {
     classic: { Mafia: 1, Silencer: 0, Detective: 1, Doctor: 1, Mayor: 0, Tracker: 0, Knight: 0, Jester: 0, Thief: 0, "Bounty Hunter": 0 },
-    "loud-quiet": { Mafia: 1, Silencer: 1, Detective: 1, Doctor: 0, Mayor: 1, Tracker: 0, Knight: 0, Jester: 1, Thief: 0, "Bounty Hunter": 0 }
+    "loud-quiet": { Mafia: 1, Silencer: 1, Detective: 1, Doctor: 0, Mayor: 1, Tracker: 0, Knight: 0, Jester: 1, Thief: 0, "Bounty Hunter": 0 },
+    royalty: { Mafia: 1, Silencer: 0, Detective: 0, Doctor: 0, Mayor: 1, Tracker: 0, Knight: 1, Jester: 1, Thief: 0, "Bounty Hunter": 0 },
+    "money-makes-the-world-go-round": { Mafia: 1, Silencer: 0, Detective: 0, Doctor: 0, Mayor: 1, Tracker: 0, Knight: 0, Jester: 0, Thief: 1, "Bounty Hunter": 0 }
   };
   const counts = presets[preset];
   if (!counts) return;
