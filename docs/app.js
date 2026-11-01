@@ -1245,7 +1245,9 @@ function renderGame() {
   };
 
   $("phase-title").textContent = phaseTitles[phase] || "Game in progress";
-  $("phase-description").textContent = phaseDescriptions[phase] || "";
+  $("phase-description").textContent = room.challengeNotice && phase === "discussion"
+    ? room.challengeNotice
+    : (phaseDescriptions[phase] || "");
   $("round-label").textContent = phase === "lobby"
     ? "Lobby"
     : phase === "finished"
@@ -1342,7 +1344,8 @@ function renderGame() {
     $("team-info").textContent = roleInfo[role]?.team || "";
 
     const investigation = privateByUid[currentUser.uid]?.investigationResult;
-    $("investigation-result").textContent = investigation || "";
+    const tracking = privateByUid[currentUser.uid]?.trackerResult;
+    $("investigation-result").textContent = [investigation, tracking].filter(Boolean).join(" ");
 
     if (
       ["Mafia", "Silencer"].includes(role) &&
@@ -2491,7 +2494,74 @@ async function resolvePhase() {
 
     room = latestRoom;
     if (phase === "discussion") {
-      await beginPhase("voting", VOTING_SECONDS, round);
+      const challenge = currentActions("discussion").find(action =>
+        action.type === "challenge" && privateByUid[action.uid]?.role === "Knight" &&
+        !privateByUid[action.uid]?.knightChallengeUsed &&
+        players.some(player => player.id === action.uid && player.alive !== false) &&
+        players.some(player => player.id === action.targetUid && player.alive !== false)
+      );
+      if (!challenge) {
+        await beginPhase("voting", VOTING_SECONDS, round);
+        return;
+      }
+
+      const remainingSeconds = secondsUntil(latestRoom.endsAt);
+      await updateDoc(roomRef(), {
+        discussionPaused: true,
+        pausedSecondsRemaining: remainingSeconds,
+        endsAt: null,
+        updatedAt: serverTimestamp()
+      });
+      room = { ...latestRoom, discussionPaused: true, pausedSecondsRemaining: remainingSeconds, endsAt: null };
+
+      const challengedRole = privateByUid[challenge.targetUid]?.role;
+      const knightData = { ...privateByUid[challenge.uid], knightChallengeUsed: true };
+      await setDoc(privateRef(challenge.uid), knightData);
+      privateByUid[challenge.uid] = knightData;
+
+      const challengeSucceeded = alignmentForRole(challengedRole) !== "Town";
+      const eliminatedUid = challengeSucceeded ? challenge.targetUid : challenge.uid;
+      await updateDoc(playerRef(eliminatedUid), {
+        alive: false,
+        ready: false,
+        roleReveal: challengeSucceeded ? challengedRole : "Knight"
+      });
+      players = players.map(player => player.id === eliminatedUid
+        ? { ...player, alive: false, roleReveal: challengeSucceeded ? challengedRole : "Knight" }
+        : player);
+
+      const challengeNotice = challengeSucceeded
+        ? playerName(challenge.targetUid) + " was challenged and revealed as " + challengedRole + ". The Knight was correct."
+        : playerName(challenge.targetUid) + " was revealed as Town. The Knight has been eliminated; voting is skipped.";
+      await updateDoc(roomRef(), { challengeNotice, updatedAt: serverTimestamp() });
+      room = { ...room, challengeNotice };
+      await clearActions();
+
+      if (!challengeSucceeded) {
+        const winner = await checkWinner();
+        if (winner) {
+          await finishGame(winner);
+          return;
+        }
+        await beginPhase("night", NIGHT_SECONDS, round);
+        return;
+      }
+
+      const winner = await checkWinner();
+      if (winner) {
+        await finishGame(winner);
+        return;
+      }
+      if (remainingSeconds <= 0) {
+        await beginPhase("voting", VOTING_SECONDS, round);
+      } else {
+        await updateDoc(roomRef(), {
+          discussionPaused: false,
+          pausedSecondsRemaining: null,
+          endsAt: timestampAfter(remainingSeconds),
+          updatedAt: serverTimestamp()
+        });
+      }
       return;
     }
 
@@ -2523,6 +2593,12 @@ async function resolvePhase() {
       const detectiveActions = nightActions.filter(action =>
         action.type === "investigate" &&
         privateByUid[action.uid]?.role === "Detective" &&
+        players.some(player => player.id === action.uid && player.alive !== false) &&
+        players.some(player => player.id === action.targetUid && player.alive !== false)
+      );
+
+      const trackerActions = nightActions.filter(action =>
+        action.type === "track" && privateByUid[action.uid]?.role === "Tracker" &&
         players.some(player => player.id === action.uid && player.alive !== false) &&
         players.some(player => player.id === action.targetUid && player.alive !== false)
       );
@@ -2569,6 +2645,19 @@ async function resolvePhase() {
           ...privateByUid[action.uid],
           investigationResult: result
         });
+      }
+
+      for (const action of trackerActions) {
+        const visited = nightActions.some(item =>
+          item.uid === action.targetUid &&
+          ["kill", "silence", "protect", "investigate", "track", "steal", "stealRole"].includes(item.type)
+        );
+        const result = playerName(action.targetUid) + (visited
+          ? " visited someone during the night."
+          : " did not visit anyone during the night.");
+        const updatedTracker = { ...privateByUid[action.uid], trackerResult: result };
+        await setDoc(privateRef(action.uid), updatedTracker);
+        privateByUid[action.uid] = updatedTracker;
       }
 
       for (const action of silenceActions) {
