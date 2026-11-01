@@ -1356,8 +1356,8 @@ function renderGame() {
   $("winner-text").textContent = winnerMessage;
   if ($("final-winner-heading")) $("final-winner-heading").textContent = winnerMessage;
 
-  renderPlayers();
   renderTargetOptions();
+  renderPlayers();
   renderActionControls();
   renderTimer();
 
@@ -1827,7 +1827,9 @@ function renderActionControls() {
 
   $("action-kind").textContent = copy.kind;
   $("action-selection-title").textContent = copy.title;
-  $("action-selection-hint").textContent = copy.hint;
+  $("action-selection-hint").textContent = eligible
+    ? `${copy.hint} Select a player from the Players list.`
+    : copy.hint;
   $("lock-action").textContent = copy.button;
   $("lock-action").disabled =
     !eligible || Boolean(currentAction) || !selectedTargetUid ||
