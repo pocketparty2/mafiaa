@@ -1817,6 +1817,22 @@ function renderFinalResults() {
     group.append(cards);
     list.append(group);
   });
+
+  const optedIn = players.filter(player => player.playAgain).length;
+  const playButton = $("play-again-button");
+  const startButton = $("start-rematch-button");
+  if (playButton) {
+    const opted = Boolean(me()?.playAgain);
+    playButton.textContent = opted ? "Cancel Play Again" : "Play Again";
+    playButton.classList.toggle("is-selected", opted);
+  }
+  if (startButton) {
+    setVisible("start-rematch-button", isHost());
+    startButton.textContent = `Start Rematch (${optedIn + (me()?.playAgain ? 0 : 1)} players)`;
+    startButton.disabled = !isHost() || (optedIn + (me()?.playAgain ? 0 : 1)) < MIN_PLAYERS;
+  }
+  const status = $("rematch-status");
+  if (status) status.textContent = `${optedIn} player${optedIn === 1 ? "" : "s"} ready to play again. ${isHost() ? "Choose Play Again, then start the rematch when you're ready." : "Wait for the host to start the rematch."}`;
 }
 
 function renderRoleRoster() {
