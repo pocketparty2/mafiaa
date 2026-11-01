@@ -1065,3 +1065,31 @@
   margin-top: 2px;
 }
 #game-screen .action-abstain-button:disabled { opacity: .45; cursor: not-allowed; }
+
+
+/* Compact role preset selector below the role counts */
+#lobby-settings-panel .role-presets {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 9px 0 5px;
+}
+#lobby-settings-panel .role-presets label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .9px;
+}
+#lobby-settings-panel #role-preset-select {
+  width: auto;
+  min-width: 0;
+  max-width: 190px;
+  min-height: 31px;
+  padding: 5px 26px 5px 9px;
+  font-size: 11px;
+}
+@media (max-width: 520px) {
+  #lobby-settings-panel .role-presets { gap: 7px; }
+  #lobby-settings-panel #role-preset-select { max-width: 170px; }
+}
