@@ -1,6 +1,6 @@
 /* Single-screen game layout: keep every game view inside the viewport */
 #game-screen {
-  flex: 1 1 auto;
+  flex: 1 1 auto; 
   height: auto;
   min-height: 0;
   display: flex;
