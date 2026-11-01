@@ -1267,16 +1267,22 @@
   background: rgba(217,75,85,.075);
   box-shadow: inset 0 0 0 1px rgba(217,75,85,.12);
 }
+#player-list .player-card.is-mafia-proposed-target { position: relative; }
 .mafia-proposal-label {
-  display: block;
-  margin-top: 5px;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  max-width: 58%;
   padding: 3px 6px;
   border-radius: 5px;
-  background: rgba(217,75,85,.14);
-  color: #e58b91;
-  font-size: 9px;
+  background: rgba(35,18,22,.9);
+  color: #f2a1a6;
+  font-size: 8px;
+  line-height: 1.2;
   font-weight: 800;
+  text-align: right;
   overflow-wrap: anywhere;
+  pointer-events: none;
 }
 .mafia-team-role {
   display: inline-flex;
