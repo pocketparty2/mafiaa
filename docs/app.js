@@ -2222,14 +2222,39 @@ function maybeResolvePhase() {
 }
 
 async function checkWinner() {
+  // Resolve win conditions from fresh Firestore data, not potentially stale
+  // onSnapshot state. Night actions can update several documents immediately
+  // before this check runs.
+  const [playerSnapshot, privateSnapshot] = await Promise.all([
+    getDocs(playersRef()),
+    getDocs(collection(db, "rooms", roomCode, "private"))
+  ]);
+
+  players = playerSnapshot.docs.map(item => ({
+    id: item.id,
+    ...item.data()
+  }));
+
+  privateByUid = {};
+  privateSnapshot.docs.forEach(item => {
+    privateByUid[item.id] = item.data();
+  });
+
+  // If role documents have not all arrived yet, do not declare a winner from
+  // an incomplete roster (which could incorrectly look like zero Mafia).
+  if (players.some(player => !privateByUid[player.id]?.role)) {
+    console.warn("Winner check skipped because some player roles are not loaded yet.");
+    return null;
+  }
+
   const living = alivePlayers();
+  if (!living.length) return null;
 
   const mafiaAlive = living.filter(player =>
     ["Mafia", "Silencer"].includes(privateByUid[player.id]?.role)
   ).length;
 
   // Neutral players still count as living opponents when checking Mafia parity.
-  // A lone Mafia must not win while a Town player and a Thief are both alive.
   const nonMafiaAlive = living.length - mafiaAlive;
 
   if (mafiaAlive === 0) return "Town";
