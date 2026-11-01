@@ -1097,30 +1097,34 @@
 
 /* Player titles and achievement progression */
 .player-title {
-  display: inline-flex;
+  display: inline-block;
   align-items: center;
   justify-content: center;
   width: fit-content;
   max-width: 100%;
-  padding: 2px 7px;
-  border: 0;
-  border-radius: 6px;
+  margin-left: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  background-image: none;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  -webkit-text-stroke: .65px var(--title-stroke, currentColor);
-  font-size: 10px;
-  line-height: 1.35;
+  -webkit-text-stroke: .8px var(--title-stroke, currentColor);
+  font-size: 15px;
+  line-height: 1.45;
   font-weight: 500;
   font-style: italic;
-  letter-spacing: .01em;
+  letter-spacing: .015em;
   text-shadow: none;
   white-space: normal;
   overflow-wrap: anywhere;
   box-sizing: border-box;
 }
-.profile-active-title { margin-top: 4px; }
-.player-card-title { margin-top: 2px; font-size: 8px; padding: 1px 4px; }
-.leaderboard-title { margin-top: 2px; font-size: 9px; padding: 1px 5px; }
+.profile-active-title { margin-top: 6px; font-size: 17px; }
+.player-card-title { display: block; margin-top: 3px; font-size: 11px; }
+.leaderboard-title { display: block; margin-top: 3px; font-size: 12px; }
+#game-screen .final-role-nameplate.player-title { font-size: 15px; }
 .leaderboard-identity { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .achievements-panel { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border, rgba(127,127,127,.2)); }
 .achievements-heading h2 { margin: 3px 0 12px; }
