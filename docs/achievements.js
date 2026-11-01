@@ -29,7 +29,7 @@ export const ACHIEVEMENTS = [
   { id: "its-not-personal", category: "Role", name: "It's Not Personal!", requirement: "Win by getting your target voted out as the Bounty Hunter", title: "Apex Predator", colors: ["#39dbc3", "#94ffef"], kind: "flag", flag: "bountyHunterWin" },
   { id: "wrong-place-wrong-knight", category: "Deaths", name: "Wrong Place, Wrong Knight", requirement: "Be eliminated by a successful Knight challenge while playing as a Mafia-aligned role", title: "The Vanquished", colors: ["#E74C3C", "#640000"], kind: "flag", flag: "knightChallengeMafiaDeath" },
   { id: "guilty-as-charged", category: "Role", name: "Guilty as Charged", requirement: "As the Knight, successfully challenge and eliminate a Mafia-aligned player", title: "Hands of Justice", colors: ["#E0E0E0", "#7F8C8D"], kind: "flag", flag: "knightFoundMafia" }
-];
+]; 
 
 export const ACHIEVEMENT_CATEGORIES = ["Winning", "Role", "Deaths", "Miscellaneous"];
 
