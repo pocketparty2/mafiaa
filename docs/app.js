@@ -2711,7 +2711,10 @@ async function resolvePhase() {
             role: inheritedRole,
             roleStolen: true,
             originalRole: "Thief",
-            inheritedFromUid: action.targetUid
+            inheritedFromUid: action.targetUid,
+            ...(inheritedRole === "Bounty Hunter"
+              ? { bountyTargetUid: privateByUid[action.targetUid]?.bountyTargetUid || null }
+              : {})
           };
 
           if (["Mafia", "Silencer"].includes(inheritedRole)) {
