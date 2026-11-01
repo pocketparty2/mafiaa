@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}   
+}    
 
 #game-screen.hidden { display: none !important; }
 
