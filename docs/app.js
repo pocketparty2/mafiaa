@@ -586,7 +586,7 @@ onAuthStateChanged(auth, async user => {
     privateByUid = {};
     actionsByUid = {};
     myAction = null;
-    profile = { displayName: "", avatarData: "" };
+    profile = { displayName: "", avatarData: "", activeTitle: "" };
     showScreen("auth");
     return;
   }
@@ -1062,9 +1062,12 @@ async function loadLeaderboard() {
       identity.className = "leaderboard-identity";
       const name = document.createElement("strong");
       name.textContent = entry.displayName || "Player";
+      const title = document.createElement("span");
+      title.className = "leaderboard-title";
+      applyTitleDesign(title, entry.activeTitle);
       const detail = document.createElement("span");
       detail.textContent = `${entry.gamesPlayed || 0} games played`;
-      identity.append(name, detail);
+      identity.append(name, title, detail);
       const rate = document.createElement("strong");
       rate.className = "leaderboard-wins";
       rate.textContent = `${Number(entry.wins || 0)} wins`;
@@ -1812,8 +1815,11 @@ function renderPlayers() {
       const name = document.createElement("strong");
       name.className = "player-card-name";
       name.textContent = `${player.name || "Player"}${isYou ? " (You)" : ""}`;
+      const title = document.createElement("span");
+      title.className = "player-card-title";
+      applyTitleDesign(title, player.activeTitle);
 
-      card.append(avatarWrap, name);
+      card.append(avatarWrap, name, title);
 
       const actionCandidates = getActionCandidates();
       const canSelect = actionCandidates.some(candidate => candidate.id === player.id);
