@@ -8,7 +8,7 @@ import {
   setPersistence,
   browserLocalPersistence,
   signOut,
-  updateEmail,
+  updateEmail, 
   updatePassword,  
   reauthenticateWithCredential, 
   EmailAuthProvider
