@@ -1056,3 +1056,12 @@
   font-size: 14px;
   white-space: nowrap;
 }
+
+
+/* Daytime abstention control */
+#game-screen .action-abstain-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  margin-top: 2px;
+}
+#game-screen .action-abstain-button:disabled { opacity: .45; cursor: not-allowed; }
