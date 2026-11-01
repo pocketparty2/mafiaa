@@ -946,7 +946,7 @@ async function recordMyGameStats() {
     cleanSweep: won && alignment === "Mafia" && mafiaStarting.length >= 2 && mafiaStarting.every(item => item.alive),
     sherlocksIntuition: privateData.sherlocksIntuition === true,
     muzzled: privateData.muzzled === true,
-    clutchSave: Number(privateData.clutchSaves || 0) >= 2
+    clutchSave: new Set(privateData.clutchSavedUids || []).size >= 2
   };
 
   const statsRef = doc(db, "leaderboard", currentUser.uid);
@@ -2305,6 +2305,8 @@ async function startGame() {
         investigationResult: "",
         trackerResult: "",
         incorrectVotes: 0,
+        voteHistory: [],
+        clutchSavedUids: [],
         clutchSaves: 0,
         silenceStreakTargetUid: null,
         silenceStreakCount: 0,
@@ -2596,7 +2598,7 @@ async function revealEliminatedPlayer(uid) {
     eliminatedPhase: room.phase
   });
   players = players.map(item => item.id === uid
-    ? { ...item, alive: false, ready: false, roleReveal }
+    ? { ...item, alive: false, ready: false, roleReveal, eliminationMethod, eliminatedRound: room.round, eliminatedPhase: room.phase }
     : item);
 }
 
@@ -2739,7 +2741,7 @@ async function resolvePhase() {
         eliminatedPhase: "discussion"
       });
       players = players.map(player => player.id === eliminatedUid
-        ? { ...player, alive: false, roleReveal: challengeSucceeded ? challengedRole : "Knight" }
+        ? { ...player, alive: false, roleReveal: challengeSucceeded ? challengedRole : "Knight", eliminationMethod: "challenge", eliminatedRound: round, eliminatedPhase: "discussion" }
         : player);
 
       const challengeNotice = challengeSucceeded
@@ -2846,7 +2848,8 @@ async function resolvePhase() {
       if (killedUid && protectedUids.has(killedUid)) {
         for (const action of doctorActions.filter(item => item.targetUid === killedUid)) {
           const doctorData = privateByUid[action.uid] || {};
-          const updatedDoctor = { ...doctorData, clutchSaves: Number(doctorData.clutchSaves || 0) + 1 };
+          const savedUids = [...new Set([...(doctorData.clutchSavedUids || []), killedUid])];
+          const updatedDoctor = { ...doctorData, clutchSavedUids: savedUids, clutchSaves: savedUids.length };
           await setDoc(privateRef(action.uid), updatedDoctor);
           privateByUid[action.uid] = updatedDoctor;
         }
@@ -3013,6 +3016,13 @@ async function resolvePhase() {
       }
 
       if (room.voteStage !== "tiebreaker" && topTargets.length > 1) {
+        for (const vote of votes) {
+          const voterData = privateByUid[vote.uid] || {};
+          const voteHistory = [...(voterData.voteHistory || []), { round, targetUid: vote.targetUid }];
+          const updatedVoter = { ...voterData, voteHistory };
+          await setDoc(privateRef(vote.uid), updatedVoter);
+          privateByUid[vote.uid] = updatedVoter;
+        }
         await clearActions();
         await updateDoc(roomRef(), {
           voteStage: "tiebreaker",
@@ -3039,15 +3049,26 @@ async function resolvePhase() {
           : player);
       }
 
-      for (const vote of votes) {
-        if (eliminatedUid && vote.targetUid === eliminatedUid) continue;
-        const voterData = privateByUid[vote.uid] || {};
+      const currentVoteByUid = new Map(votes.map(vote => [vote.uid, vote.targetUid]));
+      const votersWithPendingHistory = players
+        .filter(player => (privateByUid[player.id]?.voteHistory || []).some(item => item.round === round))
+        .map(player => player.id);
+      const votersToScore = new Set([...currentVoteByUid.keys(), ...votersWithPendingHistory]);
+
+      for (const voterUid of votersToScore) {
+        const voterData = privateByUid[voterUid] || {};
+        const history = voterData.voteHistory || [];
+        const thisRoundChoices = history.filter(item => item.round === round);
+        const currentChoice = currentVoteByUid.get(voterUid);
+        if (currentChoice) thisRoundChoices.push({ round, targetUid: currentChoice });
+        const incorrect = thisRoundChoices.filter(item => !eliminatedUid || item.targetUid !== eliminatedUid).length;
         const updatedVoter = {
           ...voterData,
-          incorrectVotes: Number(voterData.incorrectVotes || 0) + 1
+          incorrectVotes: Number(voterData.incorrectVotes || 0) + incorrect,
+          voteHistory: history.filter(item => item.round !== round)
         };
-        await setDoc(privateRef(vote.uid), updatedVoter);
-        privateByUid[vote.uid] = updatedVoter;
+        await setDoc(privateRef(voterUid), updatedVoter);
+        privateByUid[voterUid] = updatedVoter;
       }
 
       if (eliminatedUid) {
