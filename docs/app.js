@@ -3015,6 +3015,30 @@ async function resolvePhase() {
 
       if (topTargets.length === 1) eliminatedUid = topTargets[0];
 
+      const livingBeforeVote = alivePlayers();
+      const unanimous = Boolean(
+        eliminatedUid &&
+        votes.length === livingBeforeVote.length - 1 &&
+        votes.every(action => action.targetUid === eliminatedUid)
+      );
+      if (unanimous) {
+        await updateDoc(playerRef(eliminatedUid), { unanimousVote: true });
+        players = players.map(player => player.id === eliminatedUid
+          ? { ...player, unanimousVote: true }
+          : player);
+      }
+
+      for (const vote of votes) {
+        if (eliminatedUid && vote.targetUid === eliminatedUid) continue;
+        const voterData = privateByUid[vote.uid] || {};
+        const updatedVoter = {
+          ...voterData,
+          incorrectVotes: Number(voterData.incorrectVotes || 0) + 1
+        };
+        await setDoc(privateRef(vote.uid), updatedVoter);
+        privateByUid[vote.uid] = updatedVoter;
+      }
+
       if (eliminatedUid) {
         const winningHunters = players
           .filter(player => player.alive !== false && privateByUid[player.id]?.role === "Bounty Hunter" &&
