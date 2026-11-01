@@ -2,7 +2,7 @@ export const ACHIEVEMENTS = [
   { id: "first-suspect", category: "Winning", name: "First Suspect", requirement: "Win your first round", title: "First Suspect", colors: ["#d4d4d4", "#b5b5b5"], kind: "wins", target: 1 },
   { id: "street-smart", category: "Winning", name: "Street Smart", requirement: "Win 5 rounds", title: "Street Smart", colors: ["#999391", "#634e47"], kind: "wins", target: 5 },
   { id: "truth-seeker", category: "Winning", name: "Truth Seeker", requirement: "Win 10 rounds", title: "Truth Seeker", colors: ["#4e6140", "#588c30"], kind: "wins", target: 10 },
-  { id: "undefeated", category: "Winning", name: "Undefeated", requirement: "Win 25 rounds", title: "Undefeated", colors: ["#e8c838", "#ffea8a"], kind: "wins", target: 25 },
+  { id: "undefeated", category: "Winning", name: "Undefeated", requirement: "Win 25 rounds", title: "Undefeated", colors: ["#e8c838", "#ffea8a"], kind: "wins", target: 25 }, 
   { id: "untouchable", category: "Winning", name: "Untouchable", requirement: "Win 50 rounds", title: "Untouchable", colors: ["#941e4f", "#6b0f35"], kind: "wins", target: 50 },
   { id: "mastermind", category: "Winning", name: "Mastermind", requirement: "Win 100 rounds", title: "Mastermind", colors: ["#bd0606", "#9c3232"], kind: "wins", target: 100 },
   { id: "power-in-numbers", category: "Role", name: "Power in Numbers", requirement: "Win as a Townsperson", title: "Honest Citizen", colors: ["#2ECC71", "#117864"], kind: "role", role: "Townsperson" },
