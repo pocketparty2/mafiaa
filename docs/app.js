@@ -1225,7 +1225,7 @@ function renderGame() {
     lobby: "Waiting in lobby",
     night: "Night has fallen",
     discussion: "Discussion",
-    voting: "Time to vote",
+    voting: room.voteStage === "tiebreaker" ? "Tie-breaker vote" : "Time to vote",
     finished: "Game over"
   };
 
@@ -1235,7 +1235,9 @@ function renderGame() {
       : "Wait for the host to start once everyone is ready.",
     night: "The town is asleep. Your role determines what you can do.",
     discussion: "Talk it out. Who seems suspicious?",
-    voting: "Choose the player you think should be eliminated.",
+    voting: room.voteStage === "tiebreaker"
+      ? "The vote was tied. Choose between the tied players, or abstain."
+      : "Choose the player you think should be eliminated, or abstain.",
     finished: "The game has ended. See who survived."
   };
 
@@ -1712,7 +1714,9 @@ function getActionCopy(type) {
     vote: {
       kind: "DAYTIME VOTE",
       title: "Who should be eliminated?",
-      hint: "Choose the player you suspect, then lock in your vote.",
+      hint: room?.voteStage === "tiebreaker"
+        ? "Choose between the tied players, then lock in your vote."
+        : "Choose the player you suspect, then lock in your vote. You can also abstain.",
       button: "Lock in vote",
       locked: "Your vote is locked in."
     },
@@ -1786,10 +1790,13 @@ function getActionCandidates() {
     candidates = candidates.filter(player =>
       player.id !== selfUid && !teammates.includes(player.id)
     );
-  } else if (
-    (phase === "night" && ["Detective", "Doctor", "Silencer"].includes(role)) ||
-    phase === "voting"
-  ) {
+  } else if (phase === "voting") {
+    candidates = candidates.filter(player => player.id !== selfUid);
+    if (room?.voteStage === "tiebreaker") {
+      const tiedUids = room?.tiedPlayerUids || [];
+      candidates = candidates.filter(player => tiedUids.includes(player.id));
+    }
+  } else if (phase === "night" && ["Detective", "Doctor", "Silencer"].includes(role)) {
     candidates = candidates.filter(player => player.id !== selfUid);
   } else {
     candidates = [];
@@ -1823,6 +1830,11 @@ function renderActionControls() {
   const silenced = phase === "voting" && privateByUid[currentUser?.uid]?.silencedRound === room?.round;
   const eligible = alive && Boolean(type) && !silenced;
   const copy = getActionCopy(type);
+  const abstainButton = $("abstain-vote");
+  if (abstainButton) {
+    abstainButton.classList.toggle("hidden", phase !== "voting" || !eligible);
+    abstainButton.disabled = !eligible || Boolean(currentAction);
+  }
 
   $("action-kind").textContent = copy.kind;
   $("action-selection-title").textContent = copy.title;
@@ -1841,7 +1853,9 @@ function renderActionControls() {
   });
 
   if (currentAction) {
-    $("action-status").textContent = copy.locked;
+    $("action-status").textContent = currentAction.type === "abstain"
+      ? "You have abstained from this vote."
+      : copy.locked;
   } else if (!alive && !["lobby", "finished"].includes(phase)) {
     $("action-status").textContent =
       "You've been eliminated. You can watch, but you can't act.";
@@ -2070,6 +2084,11 @@ $("lock-action").addEventListener("click", async () => {
   await submitAction(type, selectedTargetUid);
 });
 
+$("abstain-vote").addEventListener("click", async () => {
+  if (room?.phase !== "voting" || getCurrentActionType() !== "vote") return;
+  await submitAction("abstain", "__abstain__");
+});
+
 async function submitAction(type, targetUid) {
   if (!roomCode || !room || !currentUser) return;
 
@@ -2090,7 +2109,7 @@ async function submitAction(type, targetUid) {
       showNotice("Your role can't perform that action.", true);
       return;
     }
-  } else if (phase === "voting" && type !== "vote") {
+  } else if (phase === "voting" && !["vote", "abstain"].includes(type)) {
     return;
   } else if (phase !== "voting" && phase !== "night") {
     return;
@@ -2108,18 +2127,24 @@ async function submitAction(type, targetUid) {
     return;
   }
 
+  const abstaining = phase === "voting" && type === "abstain";
   if (!targetUid) {
     showNotice("Choose a player first.", true);
     return;
   }
 
-  const target = players.find(player => player.id === targetUid);
+  const target = abstaining ? null : players.find(player => player.id === targetUid);
   const stealingRole = phase === "night" && type === "stealRole";
 
-  if (!target || targetUid === currentUser.uid ||
+  if (!abstaining && (!target || targetUid === currentUser.uid ||
       (stealingRole && (target.alive !== false || !privateByUid[targetUid]?.role || privateByUid[targetUid]?.role === "Thief")) ||
-      (!stealingRole && target.alive === false)) {
+      (!stealingRole && target.alive === false))) {
     showNotice(stealingRole ? "Choose a deceased player with an available role." : "Choose a living player other than yourself.", true);
+    return;
+  }
+
+  if (phase === "voting" && room.voteStage === "tiebreaker" && !abstaining && !(room.tiedPlayerUids || []).includes(targetUid)) {
+    showNotice("The tie-breaker is only between the tied players.", true);
     return;
   }
 
@@ -2143,7 +2168,7 @@ async function submitAction(type, targetUid) {
     });
 
     selectedTargetUid = null;
-    showNotice(type === "vote" ? "Vote locked in." : "Action locked in.");
+    showNotice(type === "vote" ? "Vote locked in." : type === "abstain" ? "You've abstained from this vote." : "Action locked in.");
   } catch (error) {
     showNotice(`Couldn't submit action: ${friendlyError(error)}`, true);
   }
@@ -2292,6 +2317,9 @@ async function beginPhase(phase, seconds, round = room.round) {
   await updateDoc(roomRef(), {
     phase,
     round,
+    ...(phase === "voting"
+      ? { voteStage: "initial", tiedPlayerUids: [] }
+      : { voteStage: null, tiedPlayerUids: [] }),
     endsAt: timestampAfter(seconds),
     updatedAt: serverTimestamp()
   });
@@ -2517,16 +2545,12 @@ async function resolvePhase() {
       const votes = currentActions("voting").filter(action =>
         action.type === "vote" &&
         privateByUid[action.uid]?.silencedRound !== round &&
-        players.some(player =>
-          player.id === action.uid && player.alive !== false
-        ) &&
-        players.some(player =>
-          player.id === action.targetUid && player.alive !== false
-        )
+        players.some(player => player.id === action.uid && player.alive !== false) &&
+        players.some(player => player.id === action.targetUid && player.alive !== false) &&
+        (room.voteStage !== "tiebreaker" || (room.tiedPlayerUids || []).includes(action.targetUid))
       );
 
       const counts = {};
-
       votes.forEach(action => {
         const voterRole = privateByUid[action.uid]?.role;
         const weight = voterRole === "Mayor" ? 2 : 1;
@@ -2534,18 +2558,25 @@ async function resolvePhase() {
       });
 
       let eliminatedUid = null;
-
+      let topTargets = [];
       if (Object.keys(counts).length) {
         const highest = Math.max(...Object.values(counts));
-        const topTargets = Object.keys(counts).filter(
-          uid => counts[uid] === highest
-        );
-
-        // A tied vote means nobody is eliminated.
-        if (topTargets.length === 1) {
-          eliminatedUid = topTargets[0];
-        }
+        topTargets = Object.keys(counts).filter(uid => counts[uid] === highest);
       }
+
+      if (room.voteStage !== "tiebreaker" && topTargets.length > 1) {
+        await clearActions();
+        await updateDoc(roomRef(), {
+          voteStage: "tiebreaker",
+          tiedPlayerUids: topTargets,
+          endsAt: timestampAfter(VOTING_SECONDS),
+          updatedAt: serverTimestamp()
+        });
+        showNotice("The vote is tied! A tie-breaker vote has started.");
+        return;
+      }
+
+      if (topTargets.length === 1) eliminatedUid = topTargets[0];
 
       if (eliminatedUid && privateByUid[eliminatedUid]?.role === "Jester") {
         await revealEliminatedPlayer(eliminatedUid);
@@ -2553,12 +2584,9 @@ async function resolvePhase() {
         return;
       }
 
-      if (eliminatedUid) {
-        await revealEliminatedPlayer(eliminatedUid);
-      }
+      if (eliminatedUid) await revealEliminatedPlayer(eliminatedUid);
 
       const winner = await checkWinner();
-
       if (winner) {
         await finishGame(winner);
         return;
