@@ -10,7 +10,7 @@ service cloud.firestore {
       return /databases/$(database)/documents/rooms/$(code);
     }
 
-    function isMember(code) {
+    function isMember(code) { 
       return signedIn()
         && exists(roomPath(code))
         && request.auth.uid in get(roomPath(code)).data.memberUids;
