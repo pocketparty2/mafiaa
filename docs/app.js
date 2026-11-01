@@ -1777,6 +1777,54 @@ document.addEventListener("keydown", event => {
   }
 });
 
+async function startRematch() {
+  if (!isHost() || room?.phase !== "finished" || !currentUser) return;
+  try {
+    const snapshot = await getDocs(playersRef());
+    const allPlayers = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    const returning = allPlayers.filter(player => player.playAgain || player.id === currentUser.uid);
+    if (returning.length < MIN_PLAYERS) {
+      showNotice(`At least ${MIN_PLAYERS} players need to opt in for a rematch.`, true);
+      return;
+    }
+    const returningUids = returning.map(player => player.id);
+    const leaving = allPlayers.filter(player => !returningUids.includes(player.id));
+    await Promise.all(leaving.map(async player => {
+      await deleteDoc(playerRef(player.id)).catch(() => {});
+      await deleteDoc(privateRef(player.id)).catch(() => {});
+      await deleteDoc(actionRef(player.id)).catch(() => {});
+      await deleteDoc(mafiaIntentRef(player.id)).catch(() => {});
+    }));
+    await Promise.all(returning.map(player => updateDoc(playerRef(player.id), {
+      ready: false, alive: true, playAgain: false, roleReveal: null,
+      originalRoleReveal: null, eliminationMethod: null, eliminatedRound: null,
+      eliminatedPhase: null, unanimousVote: false, fatalDiscovery: false
+    })));
+    await updateDoc(roomRef(), {
+      memberUids: returningUids, phase: "lobby", round: 0, winner: null,
+      finalResults: [], bountyHunterWinnerUids: [], nightDeaths: [], endsAt: null,
+      voteStage: null, tiedPlayerUids: [], discussionPaused: false,
+      pausedSecondsRemaining: null, challengeNotice: null, updatedAt: serverTimestamp()
+    });
+    showNotice("Rematch lobby opened! Everyone who opted in is back in the lobby.");
+  } catch (error) {
+    showNotice(`Couldn't start rematch: ${friendlyError(error)}`, true);
+  }
+}
+
+$("play-again-button").addEventListener("click", async () => {
+  if (!currentUser || room?.phase !== "finished") return;
+  const nextValue = !Boolean(me()?.playAgain);
+  try {
+    await updateDoc(playerRef(currentUser.uid), { playAgain: nextValue });
+    if (isHost() && nextValue) await startRematch();
+  } catch (error) {
+    showNotice(`Couldn't update rematch choice: ${friendlyError(error)}`, true);
+  }
+});
+
+$("start-rematch-button").addEventListener("click", startRematch);
+
 function renderFinalResults() {
   const list = $("final-player-roles");
   if (!list) return;
