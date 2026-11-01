@@ -2401,13 +2401,17 @@ async function revealEliminatedPlayer(uid) {
   const player = players.find(item => item.id === uid);
   if (!player) return;
 
+  const roleReveal = room.settings?.revealRoles === false
+    ? null
+    : (privateByUid[uid]?.role || null);
   await updateDoc(playerRef(uid), {
     alive: false,
     ready: false,
-    roleReveal: room.settings?.revealRoles === false
-      ? null
-      : (privateByUid[uid]?.role || null)
+    roleReveal
   });
+  players = players.map(item => item.id === uid
+    ? { ...item, alive: false, ready: false, roleReveal }
+    : item);
 }
 
 async function clearActions() {
@@ -2508,6 +2512,7 @@ async function resolvePhase() {
     if (phase === "discussion") {
       const challenge = currentActions("discussion").find(action =>
         action.type === "challenge" && privateByUid[action.uid]?.role === "Knight" &&
+        Boolean(privateByUid[action.targetUid]?.role) &&
         !privateByUid[action.uid]?.knightChallengeUsed &&
         players.some(player => player.id === action.uid && player.alive !== false) &&
         players.some(player => player.id === action.targetUid && player.alive !== false)
