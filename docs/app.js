@@ -1622,6 +1622,47 @@ function renderGame() {
     const roleCard = $("role-card");
     roleCard.dataset.role = role.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     applyRoleDesign(roleCard, role);
+    const mafiaPanel = $("mafia-team-panel");
+    if (mafiaPanel) {
+      const isMafiaAligned = ["Mafia", "Silencer"].includes(role);
+      mafiaPanel.classList.toggle("hidden", !isMafiaAligned);
+      mafiaPanel.replaceChildren();
+      if (isMafiaAligned) {
+        applyRoleDesign(mafiaPanel, "Mafia");
+        const heading = document.createElement("strong");
+        heading.textContent = "YOUR MAFIA TEAM";
+        const members = document.createElement("div");
+        members.className = "mafia-team-members";
+        const teammateUids = [
+          ...new Set([currentUser.uid, ...(privateByUid[currentUser.uid]?.mafiaTeammates || [])])
+        ];
+        teammateUids.forEach(uid => {
+          const player = players.find(item => item.id === uid);
+          if (!player) return;
+          const memberRole = uid === currentUser.uid
+            ? role
+            : (mafiaIntentsByUid[uid]?.role || "Mafia");
+          const member = document.createElement("div");
+          member.className = "mafia-team-member";
+          const avatar = document.createElement("div");
+          avatar.className = "profile-avatar mafia-team-avatar";
+          renderAvatar(avatar, player.avatarData || "", player.name || "Player");
+          const details = document.createElement("div");
+          details.className = "mafia-team-member-details";
+          const name = document.createElement("span");
+          name.className = "mafia-team-member-name";
+          name.textContent = uid === currentUser.uid ? `${player.name || "You"} (You)` : (player.name || "Mafia");
+          const roleLabel = document.createElement("span");
+          roleLabel.className = "mafia-team-member-role";
+          roleLabel.textContent = memberRole;
+          applyRoleDesign(roleLabel, memberRole);
+          details.append(name, roleLabel);
+          member.append(avatar, details);
+          members.append(member);
+        });
+        mafiaPanel.append(heading, members);
+      }
+    }
     const targetPanel = $("bounty-target-panel");
     if (targetPanel) {
       targetPanel.classList.toggle("hidden", role !== "Bounty Hunter");
@@ -1664,6 +1705,10 @@ function renderGame() {
     $("role-card").removeAttribute("data-role");
     $("role-card").style.removeProperty("--role-accent");
     if ($("bounty-target-panel")) $("bounty-target-panel").classList.add("hidden");
+    if ($("mafia-team-panel")) {
+      $("mafia-team-panel").classList.add("hidden");
+      $("mafia-team-panel").replaceChildren();
+    }
   }
 
   const winnerMessage = room.winner === "Mafia"
