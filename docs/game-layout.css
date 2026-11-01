@@ -1030,3 +1030,29 @@
     padding: 10px;
   }
 }
+
+
+/* Keep leaderboard profile pictures perfectly square and circular. */
+.leaderboard-avatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  flex: 0 0 36px;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.leaderboard-avatar .avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.leaderboard-wins {
+  flex: 0 0 auto;
+  font-size: 14px;
+  white-space: nowrap;
+}
