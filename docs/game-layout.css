@@ -1226,29 +1226,27 @@
 
 /* Role identity styling */
 #role-card {
-  border-color: color-mix(in srgb, var(--role-accent, #888) 55%, var(--border, #888));
-  background: linear-gradient(145deg, color-mix(in srgb, var(--role-accent, #888) 16%, transparent), transparent 70%);
+  border-color: color-mix(in srgb, var(--role-accent, #888) 65%, var(--role-accent-bottom, #555));
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--role-accent, #888) 20%, transparent),
+    color-mix(in srgb, var(--role-accent-bottom, #555) 12%, transparent));
 }
-#role-card #role-name { color: var(--role-accent, inherit); }
+#role-card #role-name {
+  background: linear-gradient(180deg, var(--role-accent, #888), var(--role-accent-bottom, #555));
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
 .role-reveal-badge {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 4px 9px;
-  border: 1px solid color-mix(in srgb, var(--role-accent, #888) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--role-accent, #888) 60%, var(--role-accent-bottom, #555));
   border-radius: 7px;
-  background: color-mix(in srgb, var(--role-accent, #888) 16%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--role-accent, #888) 22%, transparent),
+    color-mix(in srgb, var(--role-accent-bottom, #555) 18%, transparent));
   color: var(--role-accent, inherit); font-weight: 900;
 }
-.role-reveal-badge[data-role="mafia"] { --role-accent: #d94b55; }
-.role-reveal-badge[data-role="silencer"] { --role-accent: #8c5bd6; }
-.role-reveal-badge[data-role="detective"] { --role-accent: #4b8fe2; }
-.role-reveal-badge[data-role="doctor"] { --role-accent: #45b98c; }
-.role-reveal-badge[data-role="mayor"] { --role-accent: #d5a83f; }
-.role-reveal-badge[data-role="tracker"] { --role-accent: #4ca8a0; }
-.role-reveal-badge[data-role="knight"] { --role-accent: #a5a9c8; }
-.role-reveal-badge[data-role="jester"] { --role-accent: #d76bb8; }
-.role-reveal-badge[data-role="thief"] { --role-accent: #c58a45; }
-.role-reveal-badge[data-role="bounty-hunter"] { --role-accent: #e07843; }
-.role-reveal-badge[data-role="townsperson"] { --role-accent: #6caa75; }
 .bounty-target-panel {
   display: grid; grid-template-columns: auto 42px 1fr; align-items: center;
   gap: 9px; margin-top: 13px; padding: 10px;
@@ -1288,15 +1286,12 @@
   display: inline-flex;
   margin-top: 4px;
   padding: 3px 7px;
-  border: 1px solid rgba(217,75,85,.35);
+  border: 1px solid color-mix(in srgb, var(--role-accent, #888) 55%, var(--role-accent-bottom, #555));
   border-radius: 5px;
-  background: rgba(217,75,85,.1);
-  color: #e58b91;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--role-accent, #888) 18%, transparent),
+    color-mix(in srgb, var(--role-accent-bottom, #555) 14%, transparent));
+  color: var(--role-accent, inherit);
   font-size: 9px;
   font-weight: 900;
-}
-.mafia-team-role[data-role="silencer"] {
-  border-color: rgba(140,91,214,.45);
-  background: rgba(140,91,214,.12);
-  color: #b99ae9;
 }
