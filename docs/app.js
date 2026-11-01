@@ -75,6 +75,9 @@ let unsubPrivate = null;
 let unsubActions = null;
 let unsubMyPrivate = null;
 let unsubMyAction = null;
+let unsubMafiaIntents = null;
+let mafiaIntentsCode = null;
+let mafiaIntentsByUid = {};
 let hostListenersCode = null;
 
 let timerHandle = null;
@@ -166,6 +169,39 @@ function actionsRef(code = roomCode) {
 
 function actionRef(uid, code = roomCode) {
   return doc(db, "rooms", code, "actions", uid);
+}
+
+function mafiaIntentsRef(code = roomCode) {
+  return collection(db, "rooms", code, "mafiaIntents");
+}
+
+function mafiaIntentRef(uid, code = roomCode) {
+  return doc(db, "rooms", code, "mafiaIntents", uid);
+}
+
+function syncMafiaIntentListener(code = roomCode) {
+  const role = myRole();
+  if (!code || !["Mafia", "Silencer"].includes(role)) {
+    unsubMafiaIntents?.();
+    unsubMafiaIntents = null;
+    mafiaIntentsCode = null;
+    mafiaIntentsByUid = {};
+    return;
+  }
+  if (mafiaIntentsCode === code && unsubMafiaIntents) return;
+  unsubMafiaIntents?.();
+  mafiaIntentsCode = code;
+  unsubMafiaIntents = onSnapshot(mafiaIntentsRef(code), snapshot => {
+    mafiaIntentsByUid = {};
+    snapshot.docs.forEach(item => { mafiaIntentsByUid[item.id] = item.data(); });
+    renderPlayers();
+  }, error => console.warn("Mafia coordination listener unavailable:", error));
+  const own = privateByUid[currentUser.uid];
+  if (own?.role && ["Mafia", "Silencer"].includes(own.role)) {
+    setDoc(mafiaIntentRef(currentUser.uid, code), {
+      uid: currentUser.uid, role: own.role, targetUid: null, updatedAt: serverTimestamp()
+    }, { merge: true }).catch(error => console.warn("Mafia role sync failed:", error));
+  }
 }
 
 function isHost() {
@@ -1168,6 +1204,7 @@ function disconnectRoomListeners() {
   unsubActions?.();
   unsubMyPrivate?.();
   unsubMyAction?.();
+  unsubMafiaIntents?.();
 
   unsubRoom = null;
   unsubPlayers = null;
@@ -1175,6 +1212,9 @@ function disconnectRoomListeners() {
   unsubActions = null;
   unsubMyPrivate = null;
   unsubMyAction = null;
+  unsubMafiaIntents = null;
+  mafiaIntentsCode = null;
+  mafiaIntentsByUid = {};
   hostListenersCode = null;
 
   if (timerHandle) {
@@ -1281,7 +1321,7 @@ function connectToRoom(code) {
         } else {
           delete privateByUid[currentUser.uid];
         }
-
+        syncMafiaIntentListener(code);
         renderGame();
         if (room?.phase === "finished") recordMyGameStats().catch(error => console.error("Stats update failed:", error));
       }
@@ -1359,6 +1399,7 @@ function attachHostListeners(code) {
     snapshot.docs.forEach(item => {
       privateByUid[item.id] = item.data();
     });
+    syncMafiaIntentListener(code);
 
     renderGame();
     if (room?.phase === "finished") recordMyGameStats().catch(error => console.error("Stats update failed:", error));
@@ -1944,6 +1985,27 @@ function renderPlayers() {
 
       card.append(avatarWrap, name, title);
 
+      if (container.id === "player-list" && ["Mafia", "Silencer"].includes(myRole())) {
+        const privateRole = mafiaIntentsByUid[player.id]?.role;
+        if (privateRole && player.id !== currentUser.uid) {
+          const teamRole = document.createElement("span");
+          teamRole.className = "mafia-team-role";
+          teamRole.textContent = privateRole;
+          teamRole.dataset.role = privateRole.toLowerCase();
+          card.append(teamRole);
+        }
+        const proposers = Object.values(mafiaIntentsByUid)
+          .filter(intent => intent.targetUid === player.id)
+          .map(intent => players.find(person => person.id === intent.uid)?.name || "Mafia");
+        if (proposers.length) {
+          card.classList.add("is-mafia-proposed-target");
+          const proposal = document.createElement("span");
+          proposal.className = "mafia-proposal-label";
+          proposal.textContent = proposers.length === 1 ? `Chosen by ${proposers[0]}` : `Chosen by ${proposers.join(", ")}`;
+          card.append(proposal);
+        }
+      }
+
       const actionCandidates = getActionCandidates();
       const canSelect = actionCandidates.some(candidate => candidate.id === player.id);
       const actionLocked = myAction &&
@@ -1964,6 +2026,11 @@ function renderPlayers() {
         card.addEventListener("click", () => {
           if (!actionEligible || actionLocked) return;
           selectedTargetUid = player.id;
+          if (room?.phase === "night" && ["Mafia", "Silencer"].includes(myRole()) && getCurrentActionType() === "kill") {
+            setDoc(mafiaIntentRef(currentUser.uid), {
+              uid: currentUser.uid, role: myRole(), targetUid: player.id, updatedAt: serverTimestamp()
+            }, { merge: true }).catch(error => showNotice(`Couldn't share Mafia target: ${friendlyError(error)}`, true));
+          }
           renderPlayers();
           renderActionControls();
         });
@@ -2596,6 +2663,9 @@ async function submitAction(type, targetUid) {
     });
 
     selectedTargetUid = null;
+    if (phase === "night" && ["Mafia", "Silencer"].includes(role) && type === "kill") {
+      await deleteDoc(mafiaIntentRef(currentUser.uid)).catch(() => {});
+    }
     showNotice(type === "vote" ? "Vote locked in." : type === "abstain" ? "You've abstained from this vote." : "Action locked in.");
   } catch (error) {
     showNotice(`Couldn't submit action: ${friendlyError(error)}`, true);
@@ -2742,13 +2812,13 @@ async function revealEliminatedPlayer(uid) {
 }
 
 async function clearActions() {
-  await Promise.all(
-    Object.keys(actionsByUid).map(uid =>
-      deleteDoc(actionRef(uid)).catch(() => {})
-    )
-  );
+  await Promise.all([
+    ...Object.keys(actionsByUid).map(uid => deleteDoc(actionRef(uid)).catch(() => {})),
+    ...Object.keys(mafiaIntentsByUid).map(uid => deleteDoc(mafiaIntentRef(uid)).catch(() => {}))
+  ]);
 
   actionsByUid = {};
+  mafiaIntentsByUid = {};
   myAction = null;
 }
 
@@ -3123,13 +3193,6 @@ async function resolvePhase() {
           privateByUid[action.uid] = updatedThief;
           showNotice("A Thief has permanently stolen a new role!");
         }
-      }
-
-      const winner = await checkWinner();
-
-      if (winner) {
-        await finishGame(winner);
-        return;
       }
 
       await beginPhase("discussion", phaseDuration("discussion"), round, {
