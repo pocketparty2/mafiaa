@@ -1161,10 +1161,10 @@
 }
 
 
-/* Achievement categories: two fixed-size cards per row inside a vertical scroll area */
+/* Achievement categories: two columns with content-sized cards in a vertical scroll area */
 #achievements-screen .achievement-categories {
-  height: min(58vh, 560px);
-  min-height: 220px;
+  max-height: min(58vh, 560px);
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 6px;
@@ -1176,30 +1176,27 @@
 #achievements-screen .achievement-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 154px;
-  align-items: stretch;
+  align-items: start;
   gap: 8px;
 }
 #achievements-screen .achievement-card {
   width: 100%;
-  height: 154px;
-  min-height: 154px;
-  max-height: 154px;
+  height: auto;
+  min-height: 0;
+  max-height: none;
   box-sizing: border-box;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   padding: 9px;
 }
 @media (max-width: 390px) {
   #achievements-screen .achievement-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: 154px;
     gap: 6px;
   }
   #achievements-screen .achievement-card {
-    height: 154px;
-    min-height: 154px;
-    max-height: 154px;
+    height: auto;
+    min-height: 0;
+    max-height: none;
     padding: 7px;
   }
 }
