@@ -87,6 +87,20 @@ service cloud.firestore {
                 request.resource.data.type == 'investigate'
                 && get(actorPrivatePath).data.role == 'Detective'
               )
+              || (
+                request.resource.data.type == 'steal'
+                && get(actorPrivatePath).data.role == 'Thief'
+                && get(actorPrivatePath).data.roleStolen == false
+                && get(targetPath).data.alive == true
+              )
+              || (
+                request.resource.data.type == 'stealRole'
+                && get(actorPrivatePath).data.role == 'Thief'
+                && get(actorPrivatePath).data.roleStolen == false
+                && get(actorPrivatePath).data.thiefTokens >= 5
+                && get(targetPath).data.alive == false
+                && get(targetPrivatePath).data.role != 'Thief'
+              )
             )
           )
           || (
