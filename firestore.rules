@@ -155,7 +155,7 @@ service cloud.firestore {
       allow create, update: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.keys().hasOnly([
-          'displayName', 'avatarData', 'updatedAt'
+          'displayName', 'avatarData', 'activeTitle', 'updatedAt'
         ])
         && request.resource.data.keys().hasAll([
           'displayName', 'avatarData', 'updatedAt'
@@ -165,6 +165,8 @@ service cloud.firestore {
         && request.resource.data.displayName.size() <= 18
         && request.resource.data.avatarData is string
         && request.resource.data.avatarData.size() <= 150000
+        && (!('activeTitle' in request.resource.data) || request.resource.data.activeTitle is string)
+        && (!('activeTitle' in request.resource.data) || request.resource.data.activeTitle.size() <= 100)
         && request.resource.data.updatedAt == request.time;
 
       allow delete: if false;
@@ -179,7 +181,7 @@ service cloud.firestore {
           'uid', 'displayName', 'avatarData', 'gamesPlayed', 'wins', 'losses',
           'winRate', 'roleGames', 'roleWins', 'alignmentGames', 'alignmentWins',
           'mostPlayedRole', 'mostPlayedAlignment', 'currentWinStreak',
-          'bestWinStreak', 'updatedAt'
+          'bestWinStreak', 'unlockedAchievements', 'activeTitle', 'updatedAt'
         ]);
       allow delete: if false;
 
@@ -245,8 +247,14 @@ service cloud.firestore {
             && request.auth.uid == playerUid
             && isMember(code)
             && request.resource.data.diff(resource.data)
-              .affectedKeys().hasOnly(['ready'])
-            && request.resource.data.ready is bool
+              .affectedKeys().hasOnly(['ready', 'activeTitle'])
+            && (
+              (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ready'])
+                && request.resource.data.ready is bool)
+              || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeTitle'])
+                && request.resource.data.activeTitle is string
+                && request.resource.data.activeTitle.size() <= 100)
+            )
           );
 
         allow delete: if isHost(code)
