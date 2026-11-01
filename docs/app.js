@@ -890,7 +890,6 @@ async function loadLeaderboard() {
       .map(item => ({ uid: item.id, ...item.data() }))
       .filter(item => Number(item.gamesPlayed || 0) > 0)
       .sort((a, b) =>
-        Number(b.winRate || 0) - Number(a.winRate || 0) ||
         Number(b.wins || 0) - Number(a.wins || 0) ||
         Number(b.gamesPlayed || 0) - Number(a.gamesPlayed || 0)
       );
@@ -915,11 +914,11 @@ async function loadLeaderboard() {
       const name = document.createElement("strong");
       name.textContent = entry.displayName || "Player";
       const detail = document.createElement("span");
-      detail.textContent = `${entry.wins || 0} wins · ${entry.gamesPlayed || 0} games`;
+      detail.textContent = `${entry.gamesPlayed || 0} games played`;
       identity.append(name, detail);
       const rate = document.createElement("strong");
-      rate.className = "leaderboard-rate";
-      rate.textContent = `${Math.round(Number(entry.winRate || 0) * 100)}%`;
+      rate.className = "leaderboard-wins";
+      rate.textContent = `${Number(entry.wins || 0)} wins`;
       row.append(rank, avatar, identity, rate);
 
       const wrapper = document.createElement("details");
