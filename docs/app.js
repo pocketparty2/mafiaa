@@ -1991,6 +1991,26 @@ $("role-count-settings").addEventListener("click", event => {
 });
 
 
+// Apply a role preset to the host's lobby settings.
+$("role-preset-select").addEventListener("change", async event => {
+  const preset = event.target.value;
+  if (!preset || !isHost() || room?.phase !== "lobby") return;
+
+  const presets = {
+    classic: { Mafia: 1, Silencer: 0, Detective: 1, Doctor: 1, Mayor: 0, Jester: 0, Thief: 0 },
+    "loud-quiet": { Mafia: 1, Silencer: 1, Detective: 1, Doctor: 0, Mayor: 1, Jester: 1, Thief: 0 }
+  };
+  const counts = presets[preset];
+  if (!counts) return;
+
+  for (const [role, count] of Object.entries(counts)) {
+    const input = $("role-count-" + role.toLowerCase());
+    if (input) input.value = String(count);
+  }
+  await saveRoleCounts();
+  event.target.value = "";
+});
+
 $("start-game").addEventListener("click", startGame);
 
 async function startGame() {
