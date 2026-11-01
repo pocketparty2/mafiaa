@@ -60,14 +60,15 @@ export function applyTitleDesign(element, id) {
   );
   const border = "#" + average.map(value => Math.round(value * 0.75).toString(16).padStart(2, "0")).join("");
   element.style.setProperty("--title-stroke", border);
-  element.style.backgroundImage =
-    "linear-gradient(180deg, " + top + ", " + bottom + "), " +
-    "linear-gradient(var(--surface, rgba(127,127,127,.08)), var(--surface, rgba(127,127,127,.08)))";
-  element.style.backgroundClip = "text, padding-box";
-  element.style.setProperty("-webkit-background-clip", "text, padding-box");
-  element.style.backgroundOrigin = "border-box";
+  element.style.backgroundImage = "linear-gradient(180deg, " + top + ", " + bottom + ")";
+  element.style.backgroundColor = "transparent";
+  element.style.backgroundClip = "text";
+  element.style.setProperty("-webkit-background-clip", "text");
+  element.style.backgroundOrigin = "initial";
   element.style.webkitTextFillColor = "transparent";
-  element.style.webkitTextStroke = "0.65px " + border;
+  element.style.webkitTextStroke = "0.8px " + border;
   element.style.color = "transparent";
-  element.style.borderColor = border;
+  element.style.border = "0";
+  element.style.padding = "0";
+  element.style.borderRadius = "0";
 }
