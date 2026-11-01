@@ -90,6 +90,18 @@ service cloud.firestore {
                 request.resource.data.type == 'kill'
                 && get(actorPrivatePath).data.role == 'Mafia'
                 && get(targetPrivatePath).data.role != 'Mafia'
+                && get(targetPrivatePath).data.role != 'Silencer'
+              )
+              || (
+                request.resource.data.type == 'kill'
+                && get(actorPrivatePath).data.role == 'Silencer'
+                && get(targetPrivatePath).data.role != 'Mafia'
+                && get(targetPrivatePath).data.role != 'Silencer'
+              )
+              || (
+                request.resource.data.type == 'silence'
+                && get(actorPrivatePath).data.role == 'Silencer'
+                && get(targetPath).data.alive == true
               )
               || (
                 request.resource.data.type == 'protect'
