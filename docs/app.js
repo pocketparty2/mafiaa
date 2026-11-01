@@ -1550,6 +1550,7 @@ function renderGame() {
   const roleCountsValid = Object.entries(roleCounts).every(([role, count]) =>
     Number.isInteger(count) && count >= 0 && count <= MAX_PLAYERS
   ) && selectedRoleTotal <= players.length &&
+    (roleCounts.Mafia + roleCounts.Silencer >= 1) &&
     !(roleCounts.Silencer > 0 && roleCounts.Mafia < 1);
 
   setVisible("start-game", inLobby && host);
