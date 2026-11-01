@@ -290,11 +290,13 @@ service cloud.firestore {
       }
 
       match /mafiaIntents/{playerUid} {
-        allow read: if signedIn()
+        allow read: if isHost(code) || (
+          signedIn()
           && exists(/databases/$(database)/documents/rooms/$(code)/private/$(request.auth.uid))
           && get(/databases/$(database)/documents/rooms/$(code)/private/$(request.auth.uid)).data.role in ['Mafia', 'Silencer']
           && exists(/databases/$(database)/documents/rooms/$(code)/private/$(playerUid))
-          && get(/databases/$(database)/documents/rooms/$(code)/private/$(playerUid)).data.role in ['Mafia', 'Silencer'];
+          && get(/databases/$(database)/documents/rooms/$(code)/private/$(playerUid)).data.role in ['Mafia', 'Silencer']
+        );
         allow create, update: if signedIn()
           && request.auth.uid == playerUid
           && isMember(code)
