@@ -59,10 +59,15 @@ export function applyTitleDesign(element, id) {
     Math.round((parseInt(top.slice(index + 1, index + 3), 16) + parseInt(bottom.slice(index + 1, index + 3), 16)) / 2)
   );
   const border = "#" + average.map(value => Math.round(value * 0.75).toString(16).padStart(2, "0")).join("");
-  element.style.background = "linear-gradient(180deg, " + top + ", " + bottom + ")";
-  const luminance = average[0] * 0.299 + average[1] * 0.587 + average[2] * 0.114;
-  element.style.color = luminance < 145 ? "#ffffff" : "#171717";
+  element.style.setProperty("--title-stroke", border);
+  element.style.backgroundImage =
+    "linear-gradient(180deg, " + top + ", " + bottom + "), " +
+    "linear-gradient(var(--surface, rgba(127,127,127,.08)), var(--surface, rgba(127,127,127,.08)))";
+  element.style.backgroundClip = "text, padding-box";
+  element.style.setProperty("-webkit-background-clip", "text, padding-box");
+  element.style.backgroundOrigin = "border-box";
+  element.style.webkitTextFillColor = "transparent";
+  element.style.webkitTextStroke = "0.65px " + border;
+  element.style.color = "transparent";
   element.style.borderColor = border;
-  const brightness = average.reduce((sum, value) => sum + value, 0) / 3;
-  element.style.color = brightness < 145 ? "#ffffff" : "#171717";
 }
