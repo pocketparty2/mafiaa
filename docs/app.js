@@ -790,7 +790,8 @@ $("join-form").addEventListener("submit", async event => {
 
 function alignmentForRole(role) {
   if (["Mafia", "Silencer"].includes(role)) return "Mafia";
-  if (["Detective", "Doctor", "Mayor", "Townsperson"].includes(role)) return "Town";
+  if (["Detective", "Doctor", "Mayor", "Townsperson", "Tracker", "Knight"].includes(role)) return "Town";
+  if (role === "Bounty Hunter") return "Neutral";
   return "Neutral";
 }
 
@@ -814,7 +815,9 @@ async function recordMyGameStats() {
   const alignment = alignmentForRole(actualRole);
   const won = room.winner === "Jester"
     ? actualRole === "Jester"
-    : room.winner === alignment && alignment !== "Neutral";
+    : room.winner === "Bounty Hunter"
+      ? actualRole === "Bounty Hunter" && room.bountyHunterWinnerUid === currentUser.uid
+      : room.winner === alignment && alignment !== "Neutral";
   const statsRef = doc(db, "leaderboard", currentUser.uid);
   const gameRef = doc(db, "leaderboard", currentUser.uid, "games", code);
 
@@ -1234,7 +1237,7 @@ function renderGame() {
       ? "You're hosting. Wait for everyone to join and ready up."
       : "Wait for the host to start once everyone is ready.",
     night: "The town is asleep. Your role determines what you can do.",
-    discussion: "Talk it out. Who seems suspicious?",
+    discussion: role === "Knight" ? "Talk it out. You can challenge one player during discussion." : "Talk it out. Who seems suspicious?",
     voting: room.voteStage === "tiebreaker"
       ? "The vote was tied. Choose between the tied players, or abstain."
       : "Choose the player you think should be eliminated, or abstain.",
@@ -1250,7 +1253,7 @@ function renderGame() {
       : `Round ${room.round || 1}`;
 
   setVisible("lobby-controls", inLobby);
-  setVisible("action-controls", phase === "night" || phase === "voting");
+  setVisible("action-controls", phase === "night" || phase === "voting" || (phase === "discussion" && role === "Knight"));
   setVisible("finished-card", phase === "finished");
   setVisible("role-card", Boolean(role) && !inLobby);
 
@@ -1265,7 +1268,7 @@ function renderGame() {
 
   const roleCounts = getRoleCounts();
   let selectedRoleTotal = 0;
-  ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Thief"].forEach(role => {
+  ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter"].forEach(role => {
     const count = roleCounts[role];
     const input = $("role-count-" + role.toLowerCase());
     input.value = String(count);
@@ -1307,6 +1310,18 @@ function renderGame() {
       Mayor: {
         description: "Your daytime vote counts twice. Use it carefully to help the Town identify the Mafia.",
         team: "You win when all Mafia members are eliminated."
+      },
+      Tracker: {
+        description: "Each night, follow one living player. At the start of discussion, learn whether they visited anyone.",
+        team: "You win by helping the Town eliminate the Mafia."
+      },
+      Knight: {
+        description: "During discussion, challenge one living player once per game. If they are Mafia or Neutral, they are eliminated. If they are Town, you are eliminated and the game skips voting, going straight to nightfall.",
+        team: "You win by helping the Town eliminate the Mafia."
+      },
+      "Bounty Hunter": {
+        description: "You have a randomly assigned target. You win if that player is eliminated by the daytime vote.",
+        team: "Your target is " + playerName(privateByUid[currentUser.uid]?.bountyTargetUid) + ". You are Neutral."
       },
       Jester: {
         description: "You win immediately if the Town eliminates you in the daytime vote. You have no night action.",
@@ -1405,6 +1420,23 @@ const ROLE_GUIDE = {
     alignment: "Neutral",
     ability: "You have no night action. Your aim is to get the Town to eliminate you in the daytime vote.",
     win: "You win immediately if you are eliminated by the daytime vote. Being eliminated at night does not trigger your win."
+  },
+  Tracker: {
+    alignment: "Town",
+    ability: "Each night, choose one living player to follow. At the start of discussion, learn whether they visited anyone during the night.",
+    win: "Help the Town eliminate every Mafia member.",
+    notes: "Your tracking result is private to you."
+  },
+  Knight: {
+    alignment: "Town",
+    ability: "During discussion, choose one living player and challenge their role once per game. If they are Mafia or Neutral, they are eliminated and discussion resumes with the remaining time. If they are Town, you are eliminated and the game skips voting, going straight to nightfall.",
+    win: "Help the Town eliminate every Mafia member."
+  },
+  "Bounty Hunter": {
+    alignment: "Neutral",
+    ability: "You receive one randomly assigned target at the start of the game. You have no night action.",
+    win: "You win if your assigned target is eliminated through the daytime vote.",
+    notes: "Your target is private. If they are eliminated at night, you do not win."
   },
   Thief: {
     alignment: "Neutral",
@@ -1933,7 +1965,7 @@ $("reveal-check").addEventListener("change", async event => {
   }
 });
 
-const ROLE_NAMES = ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Thief", "Townsperson"];
+const ROLE_NAMES = ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter", "Townsperson"];
 
 function getRoleCounts() {
   const saved = room?.settings?.roleCounts || {};
@@ -1943,8 +1975,11 @@ function getRoleCounts() {
     Detective: Number.isInteger(saved.Detective) ? saved.Detective : 0,
     Doctor: Number.isInteger(saved.Doctor) ? saved.Doctor : 0,
     Mayor: Number.isInteger(saved.Mayor) ? saved.Mayor : 0,
+    Tracker: Number.isInteger(saved.Tracker) ? saved.Tracker : 0,
+    Knight: Number.isInteger(saved.Knight) ? saved.Knight : 0,
     Jester: Number.isInteger(saved.Jester) ? saved.Jester : 0,
-    Thief: Number.isInteger(saved.Thief) ? saved.Thief : 0
+    Thief: Number.isInteger(saved.Thief) ? saved.Thief : 0,
+    "Bounty Hunter": Number.isInteger(saved["Bounty Hunter"]) ? saved["Bounty Hunter"] : 0
   };
   counts.Townsperson = Math.max(0, players.length - Object.values(counts).reduce((sum, count) => sum + count, 0));
   return counts;
@@ -1953,7 +1988,7 @@ function getRoleCounts() {
 async function saveRoleCounts() {
   if (!isHost() || room?.phase !== "lobby") return;
   const roleCounts = {};
-  for (const role of ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Thief"]) {
+  for (const role of ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter"]) {
     const input = $("role-count-" + role.toLowerCase());
     const value = Number(input?.value);
     if (!Number.isInteger(value) || value < 0 || value > MAX_PLAYERS) {
@@ -1974,7 +2009,7 @@ async function saveRoleCounts() {
   }
 }
 
-["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Jester", "Thief"].forEach(role => {
+["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter"].forEach(role => {
   $("role-count-" + role.toLowerCase()).addEventListener("change", saveRoleCounts);
 });
 
@@ -1997,8 +2032,8 @@ $("role-preset-select").addEventListener("change", async event => {
   if (!preset || !isHost() || room?.phase !== "lobby") return;
 
   const presets = {
-    classic: { Mafia: 1, Silencer: 0, Detective: 1, Doctor: 1, Mayor: 0, Jester: 0, Thief: 0 },
-    "loud-quiet": { Mafia: 1, Silencer: 1, Detective: 1, Doctor: 0, Mayor: 1, Jester: 1, Thief: 0 }
+    classic: { Mafia: 1, Silencer: 0, Detective: 1, Doctor: 1, Mayor: 0, Tracker: 0, Knight: 0, Jester: 0, Thief: 0, "Bounty Hunter": 0 },
+    "loud-quiet": { Mafia: 1, Silencer: 1, Detective: 1, Doctor: 0, Mayor: 1, Tracker: 0, Knight: 0, Jester: 1, Thief: 0, "Bounty Hunter": 0 }
   };
   const counts = presets[preset];
   if (!counts) return;
@@ -2054,10 +2089,16 @@ async function startGame() {
 
     const writes = players.map(async player => {
       const role = roleAssignments.get(player.id);
+      const bountyTarget = role === "Bounty Hunter"
+        ? shuffle(players.filter(candidate => candidate.id !== player.id))[0]
+        : null;
 
       await setDoc(privateRef(player.id), {
         role,
         investigationResult: "",
+        trackerResult: "",
+        bountyTargetUid: bountyTarget?.id || null,
+        knightChallengeUsed: false,
         mafiaTeammates: ["Mafia", "Silencer"].includes(role)
           ? mafiaUids.filter(uid => uid !== player.id)
           : [],
