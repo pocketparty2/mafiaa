@@ -822,3 +822,137 @@
   #game-screen .final-role-player { padding: 8px 6px; gap: 7px; }
   #game-screen .final-role-avatar { width: 34px; height: 34px; min-width: 34px; }
 }
+
+
+/* Active-game player cards are the target picker */
+#game-screen #player-list .player-card.is-action-candidate {
+  cursor: pointer;
+  border: 1px solid var(--accent);
+}
+#game-screen #player-list .player-card.is-action-candidate[aria-disabled="true"] {
+  cursor: default;
+  opacity: .65;
+}
+#game-screen #player-list .player-card.is-selected-target {
+  outline: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+#game-screen #player-list .player-card.is-action-candidate:not([aria-disabled="true"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* One expandable leaderboard control per player */
+.leaderboard-entry {
+  display: block;
+  border: 1px solid var(--border, rgba(127,127,127,.2));
+  border-radius: 10px;
+  overflow: hidden;
+}
+.leaderboard-entry > summary {
+  list-style: none;
+  cursor: pointer;
+  border: 0;
+  border-radius: 0;
+}
+.leaderboard-entry > summary::-webkit-details-marker { display: none; }
+.leaderboard-entry[open] > summary { background: var(--surface, rgba(127,127,127,.08)); }
+.leaderboard-entry .leaderboard-breakdown { padding: 8px 12px 12px; }
+
+/* Alignment-based final reveal */
+#game-screen .final-player-roles { display: grid; gap: 14px; }
+#game-screen .final-alignment-group { min-width: 0; }
+#game-screen .final-alignment-heading {
+  margin: 0 0 7px;
+  font-size: 15px;
+  letter-spacing: .04em;
+}
+#game-screen .final-alignment-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+#game-screen .final-role-player.is-winner {
+  background: #f5d85e;
+  border-color: #e2bd35;
+  color: #302600;
+}
+#game-screen .final-role-player.is-winner .final-role-original,
+#game-screen .final-role-player.is-winner .final-role-status {
+  color: #594713;
+}
+#game-screen .final-role-winner-label {
+  color: #594713;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+/* Mobile: keep the game in one vertical, scrollable viewport */
+@media (max-width: 700px) {
+  #game-screen { overflow: hidden; }
+  #game-screen .game-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    padding: 0 2px 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  #game-screen .game-grid > .panel {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+  #game-screen .game-grid > .panel:first-child {
+    min-height: min-content;
+  }
+  #game-screen .game-grid > .panel:last-child {
+    display: flex;
+    flex-direction: column;
+    min-height: 180px;
+  }
+  #game-screen .game-grid > .panel:last-child .player-list {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  #game-screen .game-grid .player-list.player-card-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    gap: 6px;
+  }
+  #game-screen .game-grid .player-card {
+    min-height: 76px;
+    padding: 6px 3px;
+  }
+  #game-screen .game-grid .player-card-avatar-wrap,
+  #game-screen .game-grid .player-card-avatar {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    flex-basis: 32px;
+  }
+  #game-screen .game-grid .player-card-name { font-size: 10px; }
+  #game-screen .game-grid .player-card-status { display: block; font-size: 9px; }
+  #game-screen .final-results {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    margin: 0 2px 12px;
+  }
+  #game-screen .final-alignment-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  #game-screen .final-role-player { min-width: 0; }
+}
+
+@media (max-width: 380px) {
+  #game-screen .game-grid .player-list.player-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
