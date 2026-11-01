@@ -902,7 +902,7 @@ async function loadLeaderboard() {
     }
 
     entries.forEach((entry, index) => {
-      const row = document.createElement("article");
+      const row = document.createElement("summary");
       row.className = "leaderboard-row";
       const rank = document.createElement("strong");
       rank.className = "leaderboard-rank";
@@ -921,27 +921,10 @@ async function loadLeaderboard() {
       rate.className = "leaderboard-rate";
       rate.textContent = `${Math.round(Number(entry.winRate || 0) * 100)}%`;
       row.append(rank, avatar, identity, rate);
-      const breakdown = document.createElement("details");
-      breakdown.className = "leaderboard-breakdown";
-      const summary = document.createElement("summary");
-      summary.textContent = "View role and alignment record";
-      breakdown.append(summary);
-      const roleHeading = document.createElement("strong");
-      roleHeading.textContent = "By role";
-      const roleRows = document.createElement("div");
-      roleRows.className = "breakdown-list";
-      renderBreakdown(roleRows, entry.roleGames, entry.roleWins);
-      const alignmentHeading = document.createElement("strong");
-      alignmentHeading.textContent = "By alignment";
-      const alignmentRows = document.createElement("div");
-      alignmentRows.className = "breakdown-list";
-      renderBreakdown(alignmentRows, entry.alignmentGames, entry.alignmentWins);
-      breakdown.append(roleHeading, roleRows, alignmentHeading, alignmentRows);
+
       const wrapper = document.createElement("details");
       wrapper.className = "leaderboard-entry";
-      const summary = document.createElement("summary");
-      summary.className = "leaderboard-row";
-      summary.append(rank, avatar, identity, rate);
+      row.setAttribute("aria-label", `View ${entry.displayName || "player"} leaderboard record`);
       const breakdown = document.createElement("div");
       breakdown.className = "leaderboard-breakdown";
       const roleHeading = document.createElement("strong");
@@ -955,7 +938,7 @@ async function loadLeaderboard() {
       alignmentRows.className = "breakdown-list";
       renderBreakdown(alignmentRows, entry.alignmentGames, entry.alignmentWins);
       breakdown.append(roleHeading, roleRows, alignmentHeading, alignmentRows);
-      wrapper.append(summary, breakdown);
+      wrapper.append(row, breakdown);
       list.append(wrapper);
     });
   } catch (error) {
