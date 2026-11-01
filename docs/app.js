@@ -2871,9 +2871,11 @@ async function resolvePhase() {
         }
       }
 
-      const fatalDetectives = detectiveActions.filter(action =>
-        action.uid === killedUid && ["Mafia", "Silencer"].includes(privateByUid[action.targetUid]?.role)
-      );
+      const fatalDetectives = killedUid && !protectedUids.has(killedUid)
+        ? detectiveActions.filter(action =>
+            action.uid === killedUid && ["Mafia", "Silencer"].includes(privateByUid[action.targetUid]?.role)
+          )
+        : [];
       for (const action of fatalDetectives) {
         const detectiveData = { ...(privateByUid[action.uid] || {}), fatalDiscovery: true };
         await setDoc(privateRef(action.uid), detectiveData);
