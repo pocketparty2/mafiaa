@@ -25,7 +25,8 @@ export const ACHIEVEMENTS = [
   { id: "clean-sweep", category: "Miscellaneous", name: "Clean Sweep", requirement: "Win as Mafia without losing a teammate (only counts with 2+ Mafia)", title: "Unseen Cartel", colors: ["#D32F2F", "#750000"], kind: "flag", flag: "cleanSweep" },
   { id: "sherlocks-intuition", category: "Miscellaneous", name: "Sherlock's Intuition", requirement: "As the Detective, find a Mafia member on night 1", title: "Keen Eye", colors: ["#00B0FF", "#0D47A1"], kind: "flag", flag: "sherlocksIntuition" },
   { id: "muzzled", category: "Miscellaneous", name: "Muzzled", requirement: "As the Silencer, silence the same target 3 times in a row in one match", title: "Shh....", colors: ["#B0BEC5", "#263238"], kind: "flag", flag: "muzzled" },
-  { id: "clutch-save", category: "Miscellaneous", name: "Clutch Save", requirement: "As the Doctor, successfully protect 2 people from Mafia attacks in one match", title: "Guardian Angel", colors: ["#26d7ff", "#b6edfa"], kind: "flag", flag: "clutchSave" }
+  { id: "clutch-save", category: "Miscellaneous", name: "Clutch Save", requirement: "As the Doctor, successfully protect 2 people from Mafia attacks in one match", title: "Guardian Angel", colors: ["#26d7ff", "#b6edfa"], kind: "flag", flag: "clutchSave" },
+  { id: "its-not-personal", category: "Role", name: "It's Not Personal!", requirement: "Win by getting your target voted out as the Bounty Hunter", title: "Apex Predator", colors: ["#39dbc3", "#94ffef"], kind: "flag", flag: "bountyHunterWin" }
 ];
 
 export const ACHIEVEMENT_CATEGORIES = ["Winning", "Role", "Deaths", "Miscellaneous"];
