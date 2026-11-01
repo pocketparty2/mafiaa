@@ -1250,9 +1250,13 @@
 .bounty-target-panel {
   display: grid; grid-template-columns: auto 42px 1fr; align-items: center;
   gap: 9px; margin-top: 13px; padding: 10px;
-  border: 1px solid #e07843; border-radius: 10px; background: rgba(224,120,67,.12);
+  border: 1px solid color-mix(in srgb, var(--role-accent, #888) 65%, var(--role-accent-bottom, #555));
+  border-radius: 10px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--role-accent, #888) 18%, transparent),
+    color-mix(in srgb, var(--role-accent-bottom, #555) 14%, transparent));
 }
-.bounty-target-panel strong { color: #e07843; font-size: 10px; letter-spacing: .12em; }
+.bounty-target-panel strong { color: var(--role-accent, inherit); font-size: 10px; letter-spacing: .12em; }
 .bounty-target-avatar { width: 42px; height: 42px; }
 .bounty-target-panel span { font-weight: 800; }
 .rematch-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0; }
