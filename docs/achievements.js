@@ -60,6 +60,8 @@ export function applyTitleDesign(element, id) {
   );
   const border = "#" + average.map(value => Math.round(value * 0.75).toString(16).padStart(2, "0")).join("");
   element.style.background = "linear-gradient(180deg, " + top + ", " + bottom + ")";
+  const luminance = average[0] * 0.299 + average[1] * 0.587 + average[2] * 0.114;
+  element.style.color = luminance < 145 ? "#ffffff" : "#171717";
   element.style.borderColor = border;
   const brightness = average.reduce((sum, value) => sum + value, 0) / 3;
   element.style.color = brightness < 145 ? "#ffffff" : "#171717";
