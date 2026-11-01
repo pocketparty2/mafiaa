@@ -66,7 +66,7 @@ export function applyTitleDesign(element, id) {
   element.style.setProperty("-webkit-background-clip", "text");
   element.style.backgroundOrigin = "initial";
   element.style.webkitTextFillColor = "transparent";
-  element.style.webkitTextStroke = "0.8px " + border;
+  element.style.webkitTextStroke = "0";
   element.style.color = "transparent";
   element.style.border = "0";
   element.style.padding = "0";
