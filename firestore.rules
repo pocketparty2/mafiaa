@@ -100,6 +100,10 @@ service cloud.firestore {
                 && get(actorPrivatePath).data.role == 'Detective'
               )
               || (
+                request.resource.data.type == 'track'
+                && get(actorPrivatePath).data.role == 'Tracker'
+              )
+              || (
                 request.resource.data.type == 'steal'
                 && get(actorPrivatePath).data.role == 'Thief'
                 && get(actorPrivatePath).data.roleStolen == false
@@ -114,6 +118,14 @@ service cloud.firestore {
                 && get(targetPrivatePath).data.role != 'Thief'
               )
             )
+          )
+          || (
+            request.resource.data.phase == 'discussion'
+            && request.resource.data.type == 'challenge'
+            && exists(actorPrivatePath)
+            && get(actorPrivatePath).data.role == 'Knight'
+            && get(actorPrivatePath).data.knightChallengeUsed == false
+            && get(targetPath).data.alive == true
           )
           || (
             request.resource.data.phase == 'voting'
