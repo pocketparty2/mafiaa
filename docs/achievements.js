@@ -1,4 +1,4 @@
-export const ACHIEVEMENTS = [
+export const ACHIEVEMENTS = [ 
   { id: "first-suspect", category: "Winning", name: "First Suspect", requirement: "Win your first round", title: "First Suspect", colors: ["#d4d4d4", "#b5b5b5"], kind: "wins", target: 1 },
   { id: "street-smart", category: "Winning", name: "Street Smart", requirement: "Win 5 rounds", title: "Street Smart", colors: ["#999391", "#634e47"], kind: "wins", target: 5 },
   { id: "truth-seeker", category: "Winning", name: "Truth Seeker", requirement: "Win 10 rounds", title: "Truth Seeker", colors: ["#4e6140", "#588c30"], kind: "wins", target: 10 },
