@@ -66,13 +66,18 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         && exists(actorPath)
         && get(actorPath).data.alive == true
-        && exists(targetPath)
         && (
-          get(targetPath).data.alive == true
+          request.resource.data.type == 'abstain'
           || (
-            request.resource.data.phase == 'night'
-            && request.resource.data.type == 'stealRole'
-            && get(targetPath).data.alive == false
+            exists(targetPath)
+            && (
+              get(targetPath).data.alive == true
+              || (
+                request.resource.data.phase == 'night'
+                && request.resource.data.type == 'stealRole'
+                && get(targetPath).data.alive == false
+              )
+            )
           )
         )
         && (
@@ -112,7 +117,21 @@ service cloud.firestore {
           )
           || (
             request.resource.data.phase == 'voting'
-            && request.resource.data.type == 'vote'
+            && (
+              (
+                request.resource.data.type == 'abstain'
+                && request.resource.data.targetUid == '__abstain__'
+              )
+              || (
+                request.resource.data.type == 'vote'
+                && exists(targetPath)
+                && get(targetPath).data.alive == true
+                && (
+                  roomData.voteStage != 'tiebreaker'
+                  || request.resource.data.targetUid in roomData.tiedPlayerUids
+                )
+              )
+            )
           )
         );
     }
