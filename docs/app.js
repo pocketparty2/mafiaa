@@ -2228,12 +2228,12 @@ async function checkWinner() {
     ["Mafia", "Silencer"].includes(privateByUid[player.id]?.role)
   ).length;
 
-  const townAlive = living.filter(player =>
-    ["Detective", "Doctor", "Mayor", "Townsperson"].includes(privateByUid[player.id]?.role)
-  ).length;
+  // Neutral players still count as living opponents when checking Mafia parity.
+  // A lone Mafia must not win while a Town player and a Thief are both alive.
+  const nonMafiaAlive = living.length - mafiaAlive;
 
   if (mafiaAlive === 0) return "Town";
-  if (mafiaAlive >= townAlive) return "Mafia";
+  if (mafiaAlive >= nonMafiaAlive) return "Mafia";
 
   return null;
 }
