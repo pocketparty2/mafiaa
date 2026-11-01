@@ -377,6 +377,18 @@
                   <input id="role-count-doctor" type="number" min="0" max="12" step="1" value="0">
                   <button class="role-step-button" type="button" data-role-step="doctor" data-step="1" aria-label="Increase Doctor">+</button>
                 </div>
+                <label for="role-count-tracker">Tracker</label>
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="tracker" data-step="-1" aria-label="Decrease Tracker">−</button>
+                  <input id="role-count-tracker" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="tracker" data-step="1" aria-label="Increase Tracker">+</button>
+                </div>
+                <label for="role-count-knight">Knight</label>
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="knight" data-step="-1" aria-label="Decrease Knight">−</button>
+                  <input id="role-count-knight" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="knight" data-step="1" aria-label="Increase Knight">+</button>
+                </div>
                 <label for="role-count-mayor">Mayor</label>
                 <div class="role-stepper">
                   <button class="role-step-button" type="button" data-role-step="mayor" data-step="-1" aria-label="Decrease Mayor">−</button>
@@ -402,7 +414,12 @@
                   <input id="role-count-thief" type="number" min="0" max="12" step="1" value="0">
                   <button class="role-step-button" type="button" data-role-step="thief" data-step="1" aria-label="Increase Thief">+</button>
                 </div>
-
+                <label for="role-count-bounty-hunter">Bounty Hunter</label>
+                <div class="role-stepper">
+                  <button class="role-step-button" type="button" data-role-step="bounty-hunter" data-step="-1" aria-label="Decrease Bounty Hunter">−</button>
+                  <input id="role-count-bounty-hunter" type="number" min="0" max="12" step="1" value="0">
+                  <button class="role-step-button" type="button" data-role-step="bounty-hunter" data-step="1" aria-label="Increase Bounty Hunter">+</button>
+                </div>
               </div>
             </details>
           </div>
@@ -515,6 +532,7 @@
             <button id="abstain-vote" class="button secondary action-abstain-button hidden" type="button">
               Abstain from vote
             </button>
+            <p id="knight-challenge-note" class="muted hidden">Choose a player from the Players list, then challenge their role. You can do this once per game.</p>
 
             <p id="action-status" class="muted"></p>
           </div>
