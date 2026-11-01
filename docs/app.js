@@ -1024,7 +1024,9 @@ async function recordMyGameStats() {
     sherlocksIntuition: privateData.sherlocksIntuition === true,
     muzzled: privateData.muzzled === true,
     clutchSave: new Set(privateData.clutchSavedUids || []).size >= 2,
-    bountyHunterWin: actualRole === "Bounty Hunter" && (finishedRoom.bountyHunterWinnerUids || []).includes(currentUser.uid)
+    bountyHunterWin: actualRole === "Bounty Hunter" && (finishedRoom.bountyHunterWinnerUids || []).includes(currentUser.uid),
+    knightChallengeMafiaDeath: ownResult.eliminationMethod === "challenge" && ownResult.alignment === "Mafia",
+    knightFoundMafia: privateData.knightFoundMafia === true
   };
 
   const statsRef = doc(db, "leaderboard", currentUser.uid);
@@ -3044,6 +3046,11 @@ async function resolvePhase() {
       privateByUid[challenge.uid] = knightData;
 
       const challengeSucceeded = alignmentForRole(challengedRole) !== "Town";
+      if (challengeSucceeded && ["Mafia", "Silencer"].includes(challengedRole)) {
+        const updatedKnight = { ...knightData, knightFoundMafia: true };
+        await setDoc(privateRef(challenge.uid), updatedKnight);
+        privateByUid[challenge.uid] = updatedKnight;
+      }
       const eliminatedUid = challengeSucceeded ? challenge.targetUid : challenge.uid;
       await updateDoc(playerRef(eliminatedUid), {
         alive: false,
