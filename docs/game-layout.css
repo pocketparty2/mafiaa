@@ -956,3 +956,77 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Final reveal: muted winner highlight and a single vertical list */
+#game-screen .final-results {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+#game-screen .final-player-roles {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  gap: 16px;
+}
+#game-screen .final-alignment-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+#game-screen .final-alignment-cards {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  gap: 7px;
+}
+#game-screen .final-role-player {
+  width: 100%;
+  box-sizing: border-box;
+}
+#game-screen .final-role-player.is-winner {
+  background: rgba(116, 91, 24, .28);
+  border-color: rgba(180, 145, 48, .42);
+  color: var(--text, inherit);
+}
+#game-screen .final-role-player.is-winner .final-role-original,
+#game-screen .final-role-player.is-winner .final-role-status,
+#game-screen .final-role-player.is-winner .final-role-winner-label {
+  color: #c4a85c;
+}
+#game-screen #final-results-home {
+  flex: 0 0 auto;
+  align-self: center;
+}
+@media (max-width: 700px) {
+  #game-screen .final-results {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin: 0 2px 12px;
+    padding: 12px;
+  }
+  #game-screen .final-player-roles,
+  #game-screen .final-alignment-group,
+  #game-screen .final-alignment-cards {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+  }
+  #game-screen .final-role-player {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+  }
+}
