@@ -1711,9 +1711,9 @@ function renderPlayers() {
 
 function getCurrentActionType() {
   if (room?.phase === "voting") return "vote";
-  if (room?.phase !== "night") return null;
-
   const role = myRole();
+  if (room?.phase === "discussion") return role === "Knight" && !privateByUid[currentUser?.uid]?.knightChallengeUsed ? "challenge" : null;
+  if (room?.phase !== "night") return null;
   if (
     role === "Silencer" &&
     !players.some(player =>
@@ -1737,12 +1737,27 @@ function getCurrentActionType() {
     Mafia: "kill",
     Silencer: "silence",
     Doctor: "protect",
-    Detective: "investigate"
+    Detective: "investigate",
+    Tracker: "track"
   })[role] || null;
 }
 
 function getActionCopy(type) {
   return ({
+    challenge: {
+      kind: "KNIGHT CHALLENGE",
+      title: "Challenge a player's role",
+      hint: "Choose one living player. If they are Mafia or Neutral, they are eliminated. If they are Town, you are eliminated and the game skips the vote.",
+      button: "Challenge this player",
+      locked: "Your challenge has been submitted."
+    },
+    track: {
+      kind: "TRACKER ACTION",
+      title: "Who will you follow?",
+      hint: "Choose one living player. At discussion, you will learn whether they visited anyone tonight.",
+      button: "Track player",
+      locked: "Your target is locked in."
+    },
     vote: {
       kind: "DAYTIME VOTE",
       title: "Who should be eliminated?",
@@ -1828,7 +1843,9 @@ function getActionCandidates() {
       const tiedUids = room?.tiedPlayerUids || [];
       candidates = candidates.filter(player => tiedUids.includes(player.id));
     }
-  } else if (phase === "night" && ["Detective", "Doctor", "Silencer"].includes(role)) {
+  } else if (phase === "discussion" && role === "Knight") {
+    candidates = candidates.filter(player => player.id !== selfUid);
+  } else if (phase === "night" && ["Detective", "Doctor", "Silencer", "Tracker"].includes(role)) {
     candidates = candidates.filter(player => player.id !== selfUid);
   } else {
     candidates = [];
@@ -1862,6 +1879,13 @@ function renderActionControls() {
   const silenced = phase === "voting" && privateByUid[currentUser?.uid]?.silencedRound === room?.round;
   const eligible = alive && Boolean(type) && !silenced;
   const copy = getActionCopy(type);
+  const challengeNote = $("knight-challenge-note");
+  if (challengeNote) {
+    challengeNote.classList.toggle("hidden", phase !== "discussion" || role !== "Knight" || !eligible);
+    challengeNote.textContent = privateByUid[currentUser?.uid]?.knightChallengeUsed
+      ? "You have already used your challenge."
+      : "Choose a player from the Players list, then challenge their role. You can do this once per game.";
+  }
   const abstainButton = $("abstain-vote");
   if (abstainButton) {
     abstainButton.classList.toggle("hidden", phase !== "voting" || !eligible);
@@ -1902,6 +1926,10 @@ function renderActionControls() {
 }
 
 function renderTimer() {
+  if (room?.phase === "discussion" && room.discussionPaused) {
+    $("timer").textContent = "PAUSED";
+    return;
+  }
   if (!room || !["night", "discussion", "voting"].includes(room.phase)) {
     $("timer").textContent = "--:--";
     return;
@@ -2162,6 +2190,7 @@ async function submitAction(type, targetUid) {
       (type === "silence" && role === "Silencer" && players.some(player => player.alive !== false && privateByUid[player.id]?.role === "Mafia")) ||
       (type === "protect" && role === "Doctor") ||
       (type === "investigate" && role === "Detective") ||
+      (type === "track" && role === "Tracker") ||
       (type === "steal" && role === "Thief" && getCurrentActionType() === "steal") ||
       (type === "stealRole" && role === "Thief" && getCurrentActionType() === "stealRole")
     );
@@ -2172,7 +2201,9 @@ async function submitAction(type, targetUid) {
     }
   } else if (phase === "voting" && !["vote", "abstain"].includes(type)) {
     return;
-  } else if (phase !== "voting" && phase !== "night") {
+  } else if (phase === "discussion" && !(type === "challenge" && role === "Knight" && !privateByUid[currentUser.uid]?.knightChallengeUsed)) {
+    return;
+  } else if (phase !== "voting" && phase !== "night" && phase !== "discussion") {
     return;
   }
 
@@ -2189,6 +2220,10 @@ async function submitAction(type, targetUid) {
   }
 
   const abstaining = phase === "voting" && type === "abstain";
+  if (phase === "discussion" && type === "challenge" && privateByUid[currentUser.uid]?.knightChallengeUsed) {
+    showNotice("You have already used your challenge.", true);
+    return;
+  }
   if (!targetUid) {
     showNotice("Choose a player first.", true);
     return;
@@ -2261,7 +2296,7 @@ function requiredNightActors() {
     if (player.alive === false) return false;
 
     const role = privateByUid[player.id]?.role;
-    return ["Mafia", "Silencer", "Doctor", "Detective", "Thief"].includes(role);
+    return ["Mafia", "Silencer", "Doctor", "Detective", "Tracker", "Thief"].includes(role);
   });
 }
 
@@ -2298,6 +2333,11 @@ function maybeResolvePhase() {
     return;
   }
 
+  if (room.phase === "discussion" && room.discussionPaused) return;
+  if (room.phase === "discussion" && currentActions("discussion").some(action => action.type === "challenge")) {
+    resolvePhase();
+    return;
+  }
   const expired = secondsUntil(room.endsAt) <= 0;
   const complete = allRequiredActionsSubmitted();
 
