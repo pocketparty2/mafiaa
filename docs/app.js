@@ -937,9 +937,25 @@ async function loadLeaderboard() {
       alignmentRows.className = "breakdown-list";
       renderBreakdown(alignmentRows, entry.alignmentGames, entry.alignmentWins);
       breakdown.append(roleHeading, roleRows, alignmentHeading, alignmentRows);
-      const wrapper = document.createElement("div");
+      const wrapper = document.createElement("details");
       wrapper.className = "leaderboard-entry";
-      wrapper.append(row, breakdown);
+      const summary = document.createElement("summary");
+      summary.className = "leaderboard-row";
+      summary.append(rank, avatar, identity, rate);
+      const breakdown = document.createElement("div");
+      breakdown.className = "leaderboard-breakdown";
+      const roleHeading = document.createElement("strong");
+      roleHeading.textContent = "By role";
+      const roleRows = document.createElement("div");
+      roleRows.className = "breakdown-list";
+      renderBreakdown(roleRows, entry.roleGames, entry.roleWins);
+      const alignmentHeading = document.createElement("strong");
+      alignmentHeading.textContent = "By alignment";
+      const alignmentRows = document.createElement("div");
+      alignmentRows.className = "breakdown-list";
+      renderBreakdown(alignmentRows, entry.alignmentGames, entry.alignmentWins);
+      breakdown.append(roleHeading, roleRows, alignmentHeading, alignmentRows);
+      wrapper.append(summary, breakdown);
       list.append(wrapper);
     });
   } catch (error) {
@@ -1448,36 +1464,78 @@ function renderFinalResults() {
   if (!list) return;
   list.replaceChildren();
 
-  players.forEach(player => {
-    const card = document.createElement("article");
-    card.className = "final-role-player";
-    const avatar = document.createElement("div");
-    avatar.className = "profile-avatar final-role-avatar";
-    renderAvatar(avatar, player.avatarData || "", player.name || "Player");
+  const savedResults = Array.isArray(room?.finalResults) ? room.finalResults : [];
+  const results = savedResults.length
+    ? savedResults
+    : players.map(player => {
+        const role = player.roleReveal || "Unknown";
+        const alignment = alignmentForRole(role);
+        const won = room?.winner === "Jester"
+          ? role === "Jester"
+          : room?.winner === alignment && alignment !== "Neutral";
+        return {
+          uid: player.id, name: player.name, role,
+          originalRole: player.originalRoleReveal || null,
+          alignment, alive: player.alive !== false, won
+        };
+      });
 
-    const details = document.createElement("div");
-    details.className = "final-role-details";
-    const name = document.createElement("strong");
-    name.className = "final-role-name";
-    name.textContent = player.name || "Player";
-    const role = document.createElement("span");
-    role.className = "final-role-nameplate";
-    role.textContent = player.roleReveal || "Role unavailable";
-    details.append(name, role);
+  const alignmentOrder = ["Mafia", "Town", "Neutral"];
+  alignmentOrder.forEach(alignment => {
+    const groupResults = results.filter(result => result.alignment === alignment);
+    if (!groupResults.length) return;
 
-    if (player.originalRoleReveal === "Thief") {
-      const original = document.createElement("span");
-      original.className = "final-role-original";
-      original.textContent = "(originally Thief)";
-      details.append(original);
-    }
+    const group = document.createElement("section");
+    group.className = "final-alignment-group";
+    const heading = document.createElement("h3");
+    heading.className = "final-alignment-heading";
+    heading.textContent = alignment;
+    group.append(heading);
 
-    const status = document.createElement("span");
-    status.className = "final-role-status";
-    status.textContent = player.alive === false ? "Eliminated" : "Survived";
-    details.append(status);
-    card.append(avatar, details);
-    list.append(card);
+    const cards = document.createElement("div");
+    cards.className = "final-alignment-cards";
+    groupResults.forEach(result => {
+      const player = players.find(item => item.id === result.uid);
+      const card = document.createElement("article");
+      card.className = "final-role-player";
+      if (result.won) card.classList.add("is-winner");
+
+      const avatar = document.createElement("div");
+      avatar.className = "profile-avatar final-role-avatar";
+      renderAvatar(avatar, player?.avatarData || "", result.name || "Player");
+
+      const details = document.createElement("div");
+      details.className = "final-role-details";
+      const name = document.createElement("strong");
+      name.className = "final-role-name";
+      name.textContent = result.name || "Player";
+      const role = document.createElement("span");
+      role.className = "final-role-nameplate";
+      role.textContent = result.role || "Role unavailable";
+      details.append(name, role);
+
+      if (result.originalRole === "Thief") {
+        const original = document.createElement("span");
+        original.className = "final-role-original";
+        original.textContent = "(originally Thief)";
+        details.append(original);
+      }
+
+      const status = document.createElement("span");
+      status.className = "final-role-status";
+      status.textContent = result.alive ? "Survived" : "Eliminated";
+      details.append(status);
+      if (result.won) {
+        const winner = document.createElement("span");
+        winner.className = "final-role-winner-label";
+        winner.textContent = "WINNER";
+        details.append(winner);
+      }
+      card.append(avatar, details);
+      cards.append(card);
+    });
+    group.append(cards);
+    list.append(group);
   });
 }
 
@@ -1575,6 +1633,37 @@ function renderPlayers() {
       name.textContent = `${player.name || "Player"}${isYou ? " (You)" : ""}`;
 
       card.append(avatarWrap, name);
+
+      const actionCandidates = getActionCandidates();
+      const canSelect = actionCandidates.some(candidate => candidate.id === player.id);
+      const actionLocked = myAction &&
+        myAction.phase === room?.phase &&
+        myAction.round === room?.round;
+      const actionEligible = me()?.alive !== false &&
+        Boolean(getCurrentActionType()) &&
+        !(room?.phase === "voting" &&
+          privateByUid[currentUser?.uid]?.silencedRound === room?.round);
+
+      if (container.id === "player-list" && canSelect) {
+        card.classList.add("is-action-candidate");
+        card.classList.toggle("is-selected-target", selectedTargetUid === player.id);
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-pressed", String(selectedTargetUid === player.id));
+        card.setAttribute("aria-disabled", String(!actionEligible || Boolean(actionLocked)));
+        card.tabIndex = actionEligible && !actionLocked ? 0 : -1;
+        card.addEventListener("click", () => {
+          if (!actionEligible || actionLocked) return;
+          selectedTargetUid = player.id;
+          renderPlayers();
+          renderActionControls();
+        });
+        card.addEventListener("keydown", event => {
+          if ((event.key === "Enter" || event.key === " ") && actionEligible && !actionLocked) {
+            event.preventDefault();
+            card.click();
+          }
+        });
+      }
 
       if (isDead) {
         const status = document.createElement("span");
@@ -1728,61 +1817,13 @@ function getActionCandidates() {
 }
 
 function renderTargetOptions() {
-  const grid = $("action-player-grid");
-  if (!grid) return;
-
   const phaseKey = `${room?.phase}-${room?.round}`;
   if (selectionPhaseKey !== phaseKey) {
     selectionPhaseKey = phaseKey;
     selectedTargetUid = null;
   }
-
-  const candidates = getActionCandidates();
-  if (!candidates.some(player => player.id === selectedTargetUid)) {
+  if (!getActionCandidates().some(player => player.id === selectedTargetUid)) {
     selectedTargetUid = null;
-  }
-
-  grid.replaceChildren();
-
-  candidates.forEach(player => {
-    const selected = player.id === selectedTargetUid;
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "action-player-card";
-    card.classList.toggle("is-selected", selected);
-    card.setAttribute("aria-pressed", String(selected));
-    card.disabled = Boolean(
-      myAction &&
-      myAction.phase === room?.phase &&
-      myAction.round === room?.round
-    );
-
-    const avatar = document.createElement("div");
-    avatar.className = "profile-avatar action-player-avatar";
-    renderAvatar(avatar, player.avatarData || "", player.name || "Player");
-
-    const name = document.createElement("strong");
-    name.className = "action-player-name";
-    name.textContent = player.name || "Player";
-
-    const marker = document.createElement("span");
-    marker.className = "action-player-marker";
-    marker.textContent = selected ? "✓ Selected" : "Select";
-
-    card.append(avatar, name, marker);
-    card.addEventListener("click", () => {
-      selectedTargetUid = player.id;
-      renderTargetOptions();
-      renderActionControls();
-    });
-    grid.append(card);
-  });
-
-  if (!candidates.length) {
-    const empty = document.createElement("p");
-    empty.className = "muted action-empty";
-    empty.textContent = "There are no eligible players to choose.";
-    grid.append(empty);
   }
 }
 
@@ -1809,9 +1850,10 @@ function renderActionControls() {
     !eligible || Boolean(currentAction) || !selectedTargetUid ||
     !getActionCandidates().some(player => player.id === selectedTargetUid);
 
-  $("action-player-grid").classList.toggle("has-locked-action", Boolean(currentAction));
-  $("action-player-grid").querySelectorAll(".action-player-card").forEach(card => {
-    card.disabled = !eligible || Boolean(currentAction);
+  const selectable = eligible && !currentAction;
+  document.querySelectorAll("#player-list .player-card.is-action-candidate").forEach(card => {
+    card.setAttribute("aria-disabled", String(!selectable));
+    card.tabIndex = selectable ? 0 : -1;
   });
 
   if (currentAction) {
@@ -2247,17 +2289,36 @@ async function beginPhase(phase, seconds, round = room.round) {
 }
 
 async function finishGame(winner) {
-  await Promise.all(players.map(async player => {
+  const finalResults = players.map(player => {
     const privateData = privateByUid[player.id] || {};
+    const role = privateData.role || "Unknown";
+    const alignment = alignmentForRole(role);
+    const won = winner === "Jester"
+      ? role === "Jester"
+      : winner === alignment && alignment !== "Neutral";
+    return {
+      uid: player.id,
+      name: player.name || "Player",
+      role,
+      originalRole: privateData.roleStolen ? "Thief" : null,
+      alignment,
+      alive: player.alive !== false,
+      won
+    };
+  });
+
+  await Promise.all(players.map(async player => {
+    const result = finalResults.find(item => item.uid === player.id);
     await updateDoc(playerRef(player.id), {
-      roleReveal: privateData.role || "Unknown",
-      originalRoleReveal: privateData.roleStolen ? "Thief" : null
+      roleReveal: result?.role || "Unknown",
+      originalRoleReveal: result?.originalRole || null
     });
   }));
 
   await updateDoc(roomRef(), {
     phase: "finished",
     winner,
+    finalResults,
     endsAt: null,
     updatedAt: serverTimestamp()
   });
@@ -2546,11 +2607,15 @@ async function leaveCurrentRoom(returnHome = true) {
       transaction.update(ref, update);
     });
 
-    await Promise.all([
-      deleteDoc(playerRef(uid, code)).catch(() => {}),
-      deleteDoc(privateRef(uid, code)).catch(() => {}),
-      deleteDoc(actionRef(uid, code)).catch(() => {})
-    ]);
+    const keepMatchRecords = room?.phase && room.phase !== "lobby";
+    const cleanup = [deleteDoc(actionRef(uid, code)).catch(() => {})];
+    if (!keepMatchRecords) {
+      cleanup.push(
+        deleteDoc(playerRef(uid, code)).catch(() => {}),
+        deleteDoc(privateRef(uid, code)).catch(() => {})
+      );
+    }
+    await Promise.all(cleanup);
 
     disconnectRoomListeners();
     localStorage.removeItem(activeRoomStorageKey(uid));
