@@ -221,6 +221,13 @@ function timestampAfter(seconds) {
   return new Date(Date.now() + seconds * 1000);
 }
 
+function phaseDuration(phase) {
+  const key = { night: "nightSeconds", discussion: "discussionSeconds", voting: "votingSeconds" }[phase];
+  const fallback = { night: NIGHT_SECONDS, discussion: DISCUSSION_SECONDS, voting: VOTING_SECONDS }[phase];
+  const value = Number(room?.settings?.[key]);
+  return Number.isFinite(value) && value >= 10 && value <= 120 ? value : fallback;
+}
+
 function formatTime(seconds) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
@@ -812,7 +819,8 @@ $("create-form").addEventListener("submit", async event => {
             memberUids: [currentUser.uid],
             phase: "lobby",
             round: 0,
-            settings: { revealRoles: true, roleCounts: { Mafia: 1, Detective: 0, Doctor: 0 } },
+            settings: { revealRoles: true, nightSeconds: NIGHT_SECONDS, discussionSeconds: DISCUSSION_SECONDS, votingSeconds: VOTING_SECONDS, roleCounts: { Mafia: 1, Detective: 0, Doctor: 0 } },
+            nightDeaths: [],
             winner: null,
             endsAt: null,
             createdAt: serverTimestamp(),
@@ -972,7 +980,8 @@ async function recordMyGameStats() {
     cleanSweep: won && alignment === "Mafia" && mafiaStarting.length >= 2 && mafiaStarting.every(item => item.alive),
     sherlocksIntuition: privateData.sherlocksIntuition === true,
     muzzled: privateData.muzzled === true,
-    clutchSave: new Set(privateData.clutchSavedUids || []).size >= 2
+    clutchSave: new Set(privateData.clutchSavedUids || []).size >= 2,
+    bountyHunterWin: actualRole === "Bounty Hunter" && (finishedRoom.bountyHunterWinnerUids || []).includes(currentUser.uid)
   };
 
   const statsRef = doc(db, "leaderboard", currentUser.uid);
@@ -1441,6 +1450,20 @@ function renderGame() {
   $("phase-description").textContent = room.challengeNotice && phase === "discussion"
     ? room.challengeNotice
     : (phaseDescriptions[phase] || "");
+
+  const nightDeaths = Array.isArray(room.nightDeaths) ? room.nightDeaths : [];
+  const announcement = $("night-announcement");
+  if (announcement) {
+    announcement.classList.toggle("hidden", phase !== "discussion" || !Array.isArray(room.nightDeaths));
+    announcement.textContent = nightDeaths.length
+      ? nightDeaths.map(item => item.name || playerName(item.uid)).join(", ") + (nightDeaths.length === 1 ? " died during the night." : " died during the night.")
+      : "Nobody died during the night.";
+  }
+  const isSpectator = !inLobby && phase !== "finished" && self?.alive === false;
+  setVisible("spectator-notice", isSpectator);
+  if (isSpectator) {
+    $("spectator-notice").textContent = "SPECTATOR MODE · You've been eliminated. You can watch the rest of the game, but you can't take part in normal actions.";
+  }
   $("round-label").textContent = phase === "lobby"
     ? "Lobby"
     : phase === "finished"
@@ -1448,7 +1471,7 @@ function renderGame() {
       : `Round ${room.round || 1}`;
 
   setVisible("lobby-controls", inLobby);
-  setVisible("action-controls", phase === "night" || phase === "voting" || (phase === "discussion" && role === "Knight" && !privateByUid[currentUser.uid]?.knightChallengeUsed));
+  setVisible("action-controls", !isSpectator && (phase === "night" || phase === "voting" || (phase === "discussion" && role === "Knight" && !privateByUid[currentUser.uid]?.knightChallengeUsed)));
   setVisible("finished-card", phase === "finished");
   setVisible("role-card", Boolean(role) && !inLobby);
 
@@ -1460,6 +1483,18 @@ function renderGame() {
   setVisible("reveal-setting", inLobby && host);
   $("reveal-check").checked = room.settings?.revealRoles !== false;
   $("reveal-check").disabled = !host || !inLobby;
+
+  setVisible("timer-settings", inLobby && host);
+  [
+    ["night-duration", "nightSeconds", NIGHT_SECONDS],
+    ["discussion-duration", "discussionSeconds", DISCUSSION_SECONDS],
+    ["voting-duration", "votingSeconds", VOTING_SECONDS]
+  ].forEach(([id, key, fallback]) => {
+    const input = $(id);
+    if (!input) return;
+    if (document.activeElement !== input) input.value = String(room.settings?.[key] ?? fallback);
+    input.disabled = !host || !inLobby;
+  });
 
   const roleCounts = getRoleCounts();
   let selectedRoleTotal = 0;
@@ -1896,10 +1931,10 @@ function renderPlayers() {
         });
       }
 
-      if (isDead) {
+          if (isDead) {
         const status = document.createElement("span");
         status.className = "player-card-status";
-        status.textContent = "Eliminated";
+        status.textContent = room?.phase === "finished" ? "Eliminated" : "Spectating";
         card.append(status);
       } else if (room?.phase === "lobby") {
         const status = document.createElement("span");
@@ -2208,6 +2243,24 @@ $("reveal-check").addEventListener("change", async event => {
   }
 });
 
+["night-duration", "discussion-duration", "voting-duration"].forEach(id => {
+  $(id).addEventListener("change", async event => {
+    if (!isHost() || room?.phase !== "lobby") return;
+    const key = { "night-duration": "nightSeconds", "discussion-duration": "discussionSeconds", "voting-duration": "votingSeconds" }[id];
+    const value = Math.max(10, Math.min(120, Math.round(Number(event.target.value) / 5) * 5));
+    event.target.value = String(value);
+    try {
+      await updateDoc(roomRef(), {
+        settings: { ...(room.settings || {}), [key]: value },
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      showNotice(friendlyError(error), true);
+      event.target.value = String(room.settings?.[key] || phaseDuration(key.replace("Seconds", "")));
+    }
+  });
+});
+
 const ROLE_NAMES = ["Mafia", "Silencer", "Detective", "Doctor", "Mayor", "Tracker", "Knight", "Jester", "Thief", "Bounty Hunter", "Townsperson"];
 
 function roleCountInputId(role) {
@@ -2386,7 +2439,7 @@ async function startGame() {
       phase: "night",
       round: 1,
       winner: null,
-      endsAt: timestampAfter(NIGHT_SECONDS),
+      endsAt: timestampAfter(phaseDuration("night")),
       hostHeartbeatAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -2654,7 +2707,7 @@ async function clearActions() {
   myAction = null;
 }
 
-async function beginPhase(phase, seconds, round = room.round) {
+async function beginPhase(phase, seconds = phaseDuration(phase), round = room.round, extra = {}) {
   await clearActions();
 
   await updateDoc(roomRef(), {
@@ -2667,6 +2720,7 @@ async function beginPhase(phase, seconds, round = room.round) {
       ? { voteStage: "initial", tiedPlayerUids: [] }
       : { voteStage: null, tiedPlayerUids: [] }),
     endsAt: timestampAfter(seconds),
+    ...extra,
     updatedAt: serverTimestamp()
   });
 }
@@ -2754,7 +2808,7 @@ async function resolvePhase() {
         players.some(player => player.id === action.targetUid && player.alive !== false)
       );
       if (!challenge) {
-        await beginPhase("voting", VOTING_SECONDS, round);
+        await beginPhase("voting", phaseDuration("voting"), round);
         return;
       }
 
@@ -2777,18 +2831,19 @@ async function resolvePhase() {
       await updateDoc(playerRef(eliminatedUid), {
         alive: false,
         ready: false,
-        roleReveal: challengeSucceeded ? challengedRole : "Knight",
+        roleReveal: room.settings?.revealRoles === false ? null : (challengeSucceeded ? challengedRole : "Knight"),
         eliminationMethod: "challenge",
         eliminatedRound: round,
         eliminatedPhase: "discussion"
       });
       players = players.map(player => player.id === eliminatedUid
-        ? { ...player, alive: false, roleReveal: challengeSucceeded ? challengedRole : "Knight", eliminationMethod: "challenge", eliminatedRound: round, eliminatedPhase: "discussion" }
+        ? { ...player, alive: false, roleReveal: room.settings?.revealRoles === false ? null : (challengeSucceeded ? challengedRole : "Knight"), eliminationMethod: "challenge", eliminatedRound: round, eliminatedPhase: "discussion" }
         : player);
 
+      const revealChallengeRoles = room.settings?.revealRoles !== false;
       const challengeNotice = challengeSucceeded
-        ? playerName(challenge.targetUid) + " was challenged and revealed as " + challengedRole + ". The Knight was correct."
-        : playerName(challenge.targetUid) + " was revealed as Town. The Knight has been eliminated; voting is skipped.";
+        ? playerName(challenge.targetUid) + (revealChallengeRoles ? " was challenged and revealed as " + challengedRole + ". The Knight was correct." : " was challenged. The Knight was correct.")
+        : (revealChallengeRoles ? playerName(challenge.targetUid) + " was revealed as Town." : "The Knight challenged a Town player.") + " The Knight has been eliminated; voting is skipped.";
       await updateDoc(roomRef(), { challengeNotice, updatedAt: serverTimestamp() });
       room = { ...room, challengeNotice };
       await clearActions();
@@ -2799,7 +2854,7 @@ async function resolvePhase() {
           await finishGame(winner);
           return;
         }
-        await beginPhase("night", NIGHT_SECONDS, round);
+        await beginPhase("night", phaseDuration("night"), round);
         return;
       }
 
@@ -2809,7 +2864,7 @@ async function resolvePhase() {
         return;
       }
       if (remainingSeconds <= 0) {
-        await beginPhase("voting", VOTING_SECONDS, round);
+        await beginPhase("voting", phaseDuration("voting"), round);
       } else {
         await updateDoc(roomRef(), {
           discussionPaused: false,
@@ -3032,7 +3087,11 @@ async function resolvePhase() {
         return;
       }
 
-      await beginPhase("discussion", DISCUSSION_SECONDS, round);
+      await beginPhase("discussion", phaseDuration("discussion"), round, {
+        nightDeaths: killedUid && !protectedUids.has(killedUid)
+          ? [{ uid: killedUid, name: playerName(killedUid) }]
+          : []
+      });
       return;
     }
 
@@ -3071,7 +3130,7 @@ async function resolvePhase() {
         await updateDoc(roomRef(), {
           voteStage: "tiebreaker",
           tiedPlayerUids: topTargets,
-          endsAt: timestampAfter(VOTING_SECONDS),
+          endsAt: timestampAfter(phaseDuration("voting")),
           updatedAt: serverTimestamp()
         });
         showNotice("The vote is tied! A tie-breaker vote has started.");
@@ -3141,7 +3200,7 @@ async function resolvePhase() {
         return;
       }
 
-      await beginPhase("night", NIGHT_SECONDS, round + 1);
+      await beginPhase("night", phaseDuration("night"), round + 1);
     }
   } catch (error) {
     console.error("Game resolution failed:", key, error);
