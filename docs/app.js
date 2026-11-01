@@ -816,7 +816,7 @@ async function recordMyGameStats() {
   const won = room.winner === "Jester"
     ? actualRole === "Jester"
     : room.winner === "Bounty Hunter"
-      ? actualRole === "Bounty Hunter" && room.bountyHunterWinnerUid === currentUser.uid
+      ? actualRole === "Bounty Hunter" && (room.bountyHunterWinnerUids || []).includes(currentUser.uid)
       : room.winner === alignment && alignment !== "Neutral";
   const statsRef = doc(db, "leaderboard", currentUser.uid);
   const gameRef = doc(db, "leaderboard", currentUser.uid, "games", code);
@@ -1371,7 +1371,9 @@ function renderGame() {
       ? "The Town wins."
       : room.winner === "Jester"
         ? "The Jester wins!"
-        : "Game over";
+        : room.winner === "Bounty Hunter"
+          ? "The Bounty Hunter wins!"
+          : "Game over";
   $("winner-text").textContent = winnerMessage;
   if ($("final-winner-heading")) $("final-winner-heading").textContent = winnerMessage;
 
@@ -2429,14 +2431,16 @@ async function beginPhase(phase, seconds, round = room.round) {
   });
 }
 
-async function finishGame(winner) {
+async function finishGame(winner, bountyHunterWinnerUids = []) {
   const finalResults = players.map(player => {
     const privateData = privateByUid[player.id] || {};
     const role = privateData.role || "Unknown";
     const alignment = alignmentForRole(role);
     const won = winner === "Jester"
       ? role === "Jester"
-      : winner === alignment && alignment !== "Neutral";
+      : winner === "Bounty Hunter"
+        ? role === "Bounty Hunter" && bountyHunterWinnerUids.includes(player.id)
+        : winner === alignment && alignment !== "Neutral";
     return {
       uid: player.id,
       name: player.name || "Player",
@@ -2460,12 +2464,13 @@ async function finishGame(winner) {
     phase: "finished",
     winner,
     finalResults,
+    bountyHunterWinnerUids,
     endsAt: null,
     updatedAt: serverTimestamp()
   });
 
   await clearActions();
-  showNotice(winner === "Town" ? "The Town has won!" : winner === "Jester" ? "The Jester has won!" : "The Mafia has won!");
+  showNotice(winner === "Town" ? "The Town has won!" : winner === "Jester" ? "The Jester has won!" : winner === "Bounty Hunter" ? "The Bounty Hunter has claimed their target!" : "The Mafia has won!");
 }
 
 async function resolvePhase() {
@@ -2767,6 +2772,18 @@ async function resolvePhase() {
       }
 
       if (topTargets.length === 1) eliminatedUid = topTargets[0];
+
+      if (eliminatedUid) {
+        const winningHunters = players
+          .filter(player => player.alive !== false && privateByUid[player.id]?.role === "Bounty Hunter" &&
+            privateByUid[player.id]?.bountyTargetUid === eliminatedUid)
+          .map(player => player.id);
+        if (winningHunters.length) {
+          await revealEliminatedPlayer(eliminatedUid);
+          await finishGame("Bounty Hunter", winningHunters);
+          return;
+        }
+      }
 
       if (eliminatedUid && privateByUid[eliminatedUid]?.role === "Jester") {
         await revealEliminatedPlayer(eliminatedUid);
