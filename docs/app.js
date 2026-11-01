@@ -386,9 +386,12 @@ function renderAchievements(stats) {
       title.textContent = item.name;
       const requirement = document.createElement("p");
       requirement.textContent = item.requirement;
+      const rewardLabel = document.createElement("span");
+      rewardLabel.className = "achievement-reward-label";
+      rewardLabel.textContent = "TITLE REWARD";
       const reward = document.createElement("span");
       reward.className = "achievement-reward";
-      reward.textContent = "Title: " + item.title;
+      applyTitleDesign(reward, item.id);
       const status = document.createElement("span");
       status.className = "achievement-status";
       status.textContent = isUnlocked ? "UNLOCKED" : "LOCKED";
@@ -403,7 +406,7 @@ function renderAchievements(stats) {
       fill.className = "achievement-progress-fill";
       fill.style.width = Math.min(100, progress.value / progress.target * 100) + "%";
       bar.append(fill);
-      card.append(title, requirement, reward, status, progressText, bar);
+      card.append(title, requirement, rewardLabel, reward, status, progressText, bar);
       grid.append(card);
     });
     section.append(grid);
@@ -2890,6 +2893,14 @@ async function resolvePhase() {
         const updatedTracker = { ...privateByUid[action.uid], trackerResult: result };
         await setDoc(privateRef(action.uid), updatedTracker);
         privateByUid[action.uid] = updatedTracker;
+      }
+
+      const silencerActors = players.filter(player => player.alive !== false && privateByUid[player.id]?.role === "Silencer");
+      for (const silencer of silencerActors.filter(player => !silenceActions.some(action => action.uid === player.id))) {
+        const silencerData = privateByUid[silencer.id] || {};
+        const resetSilencer = { ...silencerData, silenceStreakTargetUid: null, silenceStreakCount: 0, muzzled: false };
+        await setDoc(privateRef(silencer.id), resetSilencer);
+        privateByUid[silencer.id] = resetSilencer;
       }
 
       for (const action of silenceActions) {
