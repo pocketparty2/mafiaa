@@ -1021,7 +1021,7 @@ async function recordMyGameStats() {
   };
 
   const statsRef = doc(db, "leaderboard", currentUser.uid);
-  const gameRef = doc(db, "leaderboard", currentUser.uid, "games", code);
+  const gameRef = doc(db, "leaderboard", currentUser.uid, "games", finishedRoom.gameId || code);
   let newlyUnlocked = [];
 
   await runTransaction(db, async transaction => {
@@ -1802,6 +1802,7 @@ async function startRematch() {
     })));
     await updateDoc(roomRef(), {
       memberUids: returningUids, phase: "lobby", round: 0, winner: null,
+      gameId: crypto.randomUUID(),
       finalResults: [], bountyHunterWinnerUids: [], nightDeaths: [], endsAt: null,
       voteStage: null, tiedPlayerUids: [], discussionPaused: false,
       pausedSecondsRemaining: null, challengeNotice: null, updatedAt: serverTimestamp()
@@ -2599,6 +2600,7 @@ async function startGame() {
       phase: "night",
       round: 1,
       winner: null,
+      gameId: crypto.randomUUID(),
       endsAt: timestampAfter(phaseDuration("night")),
       hostHeartbeatAt: serverTimestamp(),
       updatedAt: serverTimestamp()
