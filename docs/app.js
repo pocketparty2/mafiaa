@@ -1701,10 +1701,13 @@ function renderFinalResults() {
       const name = document.createElement("strong");
       name.className = "final-role-name";
       name.textContent = result.name || "Player";
+      const title = document.createElement("span");
+      title.className = "final-player-title";
+      applyTitleDesign(title, result.activeTitle || player?.activeTitle);
       const role = document.createElement("span");
       role.className = "final-role-nameplate";
       role.textContent = result.role || "Role unavailable";
-      details.append(name, role);
+      details.append(name, title, role);
 
       if (result.originalRole === "Thief") {
         const original = document.createElement("span");
@@ -2659,6 +2662,7 @@ async function finishGame(winner, bountyHunterWinnerUids = []) {
     return {
       uid: player.id,
       name: player.name || "Player",
+      activeTitle: player.activeTitle || "",
       role,
       originalRole: privateData.roleStolen ? "Thief" : null,
       alignment,
