@@ -330,8 +330,23 @@ async function saveProfileDocument(displayName, avatarData) {
 }
 
 async function loadMyStats() {
-  const snapshot = await getDoc(doc(db, "leaderboard", currentUser.uid));
+  const statsRef = doc(db, "leaderboard", currentUser.uid);
+  const snapshot = await getDoc(statsRef);
   myStats = snapshot.exists() ? snapshot.data() : {};
+  const unlocked = new Set(myStats.unlockedAchievements || []);
+  ACHIEVEMENTS.forEach(item => {
+    if (item.kind === "wins" && Number(myStats.wins || 0) >= item.target) unlocked.add(item.id);
+    if (item.kind === "role" && Number(myStats.roleWins?.[item.role] || 0) >= 1) unlocked.add(item.id);
+  });
+  const unlockedAchievements = [...unlocked];
+  if (unlockedAchievements.length !== (myStats.unlockedAchievements || []).length) {
+    await setDoc(statsRef, {
+      uid: currentUser.uid,
+      unlockedAchievements,
+      activeTitle: myStats.activeTitle || profile.activeTitle || ""
+    }, { merge: true });
+    myStats = { ...myStats, unlockedAchievements };
+  }
   renderMyStats(myStats);
 }
 
