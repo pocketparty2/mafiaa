@@ -115,6 +115,7 @@
       <div id="home-content">
       <div class="button-row home-navigation">
         <button id="statistics-button" class="button" type="button">Your statistics</button>
+        <button id="achievements-button" class="button" type="button">Achievements &amp; titles</button>
         <button id="leaderboard-button" class="button" type="button">Global leaderboard</button>
       </div>
 
@@ -278,16 +279,22 @@
           <div><h3>Wins by role</h3><div id="my-role-breakdown" class="breakdown-list">No completed games yet.</div></div>
           <div><h3>Wins by alignment</h3><div id="my-alignment-breakdown" class="breakdown-list">No completed games yet.</div></div>
         </div>
-        <section id="achievements-panel" class="achievements-panel">
-          <div class="achievements-heading"><div><p class="eyebrow">PROGRESSION</p><h2>Achievements &amp; titles</h2></div></div>
-          <div class="active-title-picker">
-            <label for="active-title-select">Your displayed title</label>
-            <select id="active-title-select"><option value="">No title</option></select>
-            <p class="muted">Unlock titles by completing achievements, then choose which one appears beside your name.</p>
-          </div>
-          <div id="achievement-tabs" class="achievement-tabs" role="tablist" aria-label="Achievement categories"></div>
-          <div id="achievement-categories" class="achievement-categories" role="tabpanel"></div>
-        </section>
+      </section>
+    </section>
+
+    <section id="achievements-screen" class="panel hidden">
+      <section class="subpanel achievements-page-panel">
+        <div class="stats-heading-row">
+          <div><p class="eyebrow">PROGRESSION</p><h2>Achievements &amp; titles</h2></div>
+          <button id="achievements-back" class="button subtle" type="button">Back</button>
+        </div>
+        <div class="active-title-picker">
+          <label for="active-title-select">Your displayed title</label>
+          <select id="active-title-select"><option value="">No title</option></select>
+          <p class="muted">Unlock achievements to earn titles, then choose which one appears beside your name.</p>
+        </div>
+        <div id="achievement-tabs" class="achievement-tabs" role="tablist" aria-label="Achievement categories"></div>
+        <div id="achievement-categories" class="achievement-categories" role="tabpanel"></div>
       </section>
     </section>
 
