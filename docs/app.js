@@ -2812,9 +2812,10 @@ async function revealEliminatedPlayer(uid) {
 }
 
 async function clearActions() {
+  const intentSnapshot = await getDocs(mafiaIntentsRef()).catch(() => null);
   await Promise.all([
     ...Object.keys(actionsByUid).map(uid => deleteDoc(actionRef(uid)).catch(() => {})),
-    ...Object.keys(mafiaIntentsByUid).map(uid => deleteDoc(mafiaIntentRef(uid)).catch(() => {}))
+    ...(intentSnapshot?.docs || []).map(item => deleteDoc(mafiaIntentRef(item.id)).catch(() => {}))
   ]);
 
   actionsByUid = {};
