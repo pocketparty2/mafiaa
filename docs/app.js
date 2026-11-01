@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js"; 
-import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, achievementById, applyTitleDesign } from "./achievements.js"; 
+import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, achievementById, applyTitleDesign, roleTitleColors } from "./achievements.js"; 
 import {  
   getAuth, 
   createUserWithEmailAndPassword,
@@ -415,6 +415,13 @@ function renderMyStats(stats) {
 function renderPlayerTitle(element, id) {
   if (!element) return;
   applyTitleDesign(element, id);
+}
+
+function applyRoleDesign(element, role) {
+  if (!element || !role) return;
+  const [top, bottom] = roleTitleColors(role);
+  element.style.setProperty("--role-accent", top);
+  element.style.setProperty("--role-accent-bottom", bottom);
 }
 
 function achievementProgress(stats, achievement) {
@@ -1614,12 +1621,7 @@ function renderGame() {
     $("team-info").textContent = roleInfo[role]?.team || "";
     const roleCard = $("role-card");
     roleCard.dataset.role = role.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    roleCard.style.setProperty("--role-accent", ({
-      Mafia: "#d94b55", Silencer: "#8c5bd6", Detective: "#4b8fe2",
-      Doctor: "#45b98c", Mayor: "#d5a83f", Tracker: "#4ca8a0",
-      Knight: "#a5a9c8", Jester: "#d76bb8", Thief: "#c58a45",
-      "Bounty Hunter": "#e07843", Townsperson: "#6caa75"
-    })[role] || "#8b8b8b");
+    applyRoleDesign(roleCard, role);
     const targetPanel = $("bounty-target-panel");
     if (targetPanel) {
       targetPanel.classList.toggle("hidden", role !== "Bounty Hunter");
@@ -2041,7 +2043,8 @@ function renderPlayers() {
           const teamRole = document.createElement("span");
           teamRole.className = "mafia-team-role";
           teamRole.textContent = privateRole;
-          teamRole.dataset.role = privateRole.toLowerCase();
+          teamRole.dataset.role = privateRole.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+          applyRoleDesign(teamRole, privateRole);
           card.append(teamRole);
         }
         const proposers = Object.values(mafiaIntentsByUid)
@@ -2113,6 +2116,7 @@ function renderPlayers() {
         badge.className = "role-badge role-reveal-badge";
         badge.textContent = player.roleReveal;
         badge.dataset.role = player.roleReveal.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        applyRoleDesign(badge, player.roleReveal);
         card.append(badge);
       }
 
