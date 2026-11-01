@@ -2872,7 +2872,7 @@ async function resolvePhase() {
       }
 
       const fatalDetectives = detectiveActions.filter(action =>
-        action.uid === killedUid && privateByUid[action.targetUid]?.role === "Mafia"
+        action.uid === killedUid && ["Mafia", "Silencer"].includes(privateByUid[action.targetUid]?.role)
       );
       for (const action of fatalDetectives) {
         const detectiveData = { ...(privateByUid[action.uid] || {}), fatalDiscovery: true };
@@ -2888,14 +2888,14 @@ async function resolvePhase() {
 
       for (const action of detectiveActions) {
         const targetRole = privateByUid[action.targetUid]?.role;
-        const result = targetRole === "Mafia"
+        const result = ["Mafia", "Silencer"].includes(targetRole)
           ? `${playerName(action.targetUid)} is Mafia.`
           : `${playerName(action.targetUid)} is not Mafia.`;
 
         const detectiveData = {
           ...privateByUid[action.uid],
           investigationResult: result,
-          ...(round === 1 && targetRole === "Mafia" ? { sherlocksIntuition: true } : {})
+          ...(round === 1 && ["Mafia", "Silencer"].includes(targetRole) ? { sherlocksIntuition: true } : {})
         };
         await setDoc(privateRef(action.uid), detectiveData);
         privateByUid[action.uid] = detectiveData;
