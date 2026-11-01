@@ -289,6 +289,24 @@ service cloud.firestore {
         allow write: if isHost(code);
       }
 
+      match /mafiaIntents/{playerUid} {
+        allow read: if signedIn()
+          && exists(/databases/$(database)/documents/rooms/$(code)/private/$(request.auth.uid))
+          && get(/databases/$(database)/documents/rooms/$(code)/private/$(request.auth.uid)).data.role in ['Mafia', 'Silencer']
+          && exists(/databases/$(database)/documents/rooms/$(code)/private/$(playerUid))
+          && get(/databases/$(database)/documents/rooms/$(code)/private/$(playerUid)).data.role in ['Mafia', 'Silencer'];
+        allow create, update: if signedIn()
+          && request.auth.uid == playerUid
+          && isMember(code)
+          && request.resource.data.uid == playerUid
+          && request.resource.data.role in ['Mafia', 'Silencer']
+          && request.resource.data.keys().hasOnly(['uid', 'role', 'targetUid', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time
+          && get(/databases/$(database)/documents/rooms/$(code)/private/$(playerUid)).data.role == request.resource.data.role
+          && get(roomPath(code)).data.phase == 'night';
+        allow delete: if isHost(code) || (signedIn() && request.auth.uid == playerUid);
+      }
+
       match /actions/{playerUid} {
         allow read: if signedIn()
           && (
