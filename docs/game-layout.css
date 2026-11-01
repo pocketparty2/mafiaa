@@ -1105,13 +1105,15 @@
   padding: 2px 7px;
   border: 1px solid;
   border-radius: 6px;
-  color: #171717;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: .65px var(--title-stroke, currentColor);
   font-size: 10px;
   line-height: 1.35;
   font-weight: 900;
   font-style: italic;
   letter-spacing: .01em;
-  text-shadow: 0 1px 0 rgba(255,255,255,.18);
+  text-shadow: none;
   white-space: normal;
   overflow-wrap: anywhere;
   box-sizing: border-box;
