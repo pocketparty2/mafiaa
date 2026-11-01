@@ -1118,9 +1118,9 @@
   overflow-wrap: anywhere;
   box-sizing: border-box;
 }
-.profile-active-title { margin-top: 4px; font-size: 10px; }
-.player-card-title { display: block; margin-top: 2px; font-size: 8px; }
-.leaderboard-title { display: block; margin-top: 2px; font-size: 9px; }
+.profile-active-title { margin-top: 2px; font-size: 12px; line-height: 1.15; font-weight: 700; }
+.player-card-title { display: block; margin-top: 1px; font-size: 10px; line-height: 1.15; font-weight: 700; }
+.leaderboard-title { display: block; margin-top: 1px; font-size: 11px; line-height: 1.15; font-weight: 700; }
 #game-screen .final-role-nameplate.player-title { font-size: 10px; }
 .leaderboard-identity { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .achievements-panel { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border, rgba(127,127,127,.2)); }
