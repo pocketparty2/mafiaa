@@ -552,6 +552,7 @@
             <p id="role-description"></p>
             <p id="investigation-result" class="muted"></p>
             <p id="team-info" class="muted"></p>
+            <div id="bounty-target-panel" class="bounty-target-panel hidden"></div>
           </div>
 
           <div id="action-controls" class="stack hidden">
@@ -604,7 +605,12 @@
           <p>Here is how everyone was playing.</p>
         </div>
         <div id="final-player-roles" class="final-player-roles"></div>
-        <button id="final-results-home" class="button primary" type="button">Return home</button>
+        <div id="rematch-controls" class="rematch-controls">
+          <p id="rematch-status" class="muted"></p>
+          <button id="play-again-button" class="button secondary" type="button">Play Again</button>
+          <button id="start-rematch-button" class="button primary hidden" type="button">Start Rematch</button>
+        </div>
+        <button id="final-results-home" class="button secondary" type="button">Return home</button>
       </section>
     </section>
   </main>
