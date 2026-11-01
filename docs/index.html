@@ -99,6 +99,7 @@
 
         <div id="profile-display-name-container">
           <h2 id="profile-display-name">Player</h2>
+          <div id="profile-active-title" class="profile-active-title hidden"></div>
           <p id="profile-email" class="hidden"></p>
         </div>
 
@@ -277,6 +278,15 @@
           <div><h3>Wins by role</h3><div id="my-role-breakdown" class="breakdown-list">No completed games yet.</div></div>
           <div><h3>Wins by alignment</h3><div id="my-alignment-breakdown" class="breakdown-list">No completed games yet.</div></div>
         </div>
+        <section id="achievements-panel" class="achievements-panel">
+          <div class="achievements-heading"><div><p class="eyebrow">PROGRESSION</p><h2>Achievements &amp; titles</h2></div></div>
+          <div class="active-title-picker">
+            <label for="active-title-select">Your displayed title</label>
+            <select id="active-title-select"><option value="">No title</option></select>
+            <p class="muted">Unlock titles by completing achievements, then choose which one appears beside your name.</p>
+          </div>
+          <div id="achievement-categories" class="achievement-categories"></div>
+        </section>
       </section>
     </section>
 
@@ -286,7 +296,7 @@
           <div><p class="eyebrow">GLOBAL RANKINGS</p><h2>Leaderboard</h2></div>
           <button id="leaderboard-back" class="button subtle" type="button">Back</button>
         </div>
-        <p class="stats-footnote">Ranked by win percentage, with wins and games as tie-breakers.</p>
+        <p class="stats-footnote">Ranked by total wins, with games played as the tie-breaker.</p>
         <div id="leaderboard-list" class="leaderboard-list">Loading leaderboard…</div>
       </section>
     </section>
