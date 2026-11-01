@@ -20,7 +20,7 @@
   font-size: clamp(21px, 4vw, 30px);
 }
 
-#game-screen .lobby-layout,
+#game-screen .lobby-layout, 
 #game-screen .game-grid {
   flex: 1 1 auto;
   min-height: 0;
