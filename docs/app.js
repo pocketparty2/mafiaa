@@ -805,21 +805,40 @@ function mostPlayedKey(map) {
 
 async function recordMyGameStats() {
   if (!currentUser || !roomCode || !room || room.phase !== "finished") return;
+  const code = roomCode;
   const player = players.find(item => item.id === currentUser.uid);
-  const privateData = privateByUid[currentUser.uid] || {};
+  const privateSnapshot = await getDoc(privateRef(currentUser.uid));
+  const privateData = privateSnapshot.exists() ? privateSnapshot.data() : (privateByUid[currentUser.uid] || {});
   const actualRole = privateData.role;
   const role = privateData.roleStolen ? "Thief" : actualRole;
   if (!player || !actualRole || !room.winner) return;
 
-  const code = roomCode;
   const alignment = alignmentForRole(actualRole);
   const won = room.winner === "Jester"
     ? actualRole === "Jester"
     : room.winner === "Bounty Hunter"
       ? actualRole === "Bounty Hunter" && (room.bountyHunterWinnerUids || []).includes(currentUser.uid)
       : room.winner === alignment && alignment !== "Neutral";
+  const finalResults = Array.isArray(room.finalResults) ? room.finalResults : [];
+  const ownResult = finalResults.find(item => item.uid === currentUser.uid) || {};
+  const mafiaStarting = finalResults.filter(item => ["Mafia", "Silencer"].includes(item.startingRole));
+  const gameFlags = {
+    day1TownVoteOut: ownResult.eliminationMethod === "vote" && ownResult.eliminatedRound === 1 && ownResult.alignment === "Town",
+    day1MafiaVoteOut: ownResult.eliminationMethod === "vote" && ownResult.eliminatedRound === 1 && ownResult.alignment === "Mafia",
+    doctorVoteOut: ownResult.eliminationMethod === "vote" && actualRole === "Doctor",
+    unanimousVoteOut: ownResult.unanimousVote === true,
+    nightOneCasualty: ownResult.eliminationMethod === "night" && ownResult.eliminatedRound === 1,
+    fatalDiscovery: ownResult.fatalDiscovery === true || privateData.fatalDiscovery === true,
+    silentVerdict: won && alignment === "Town" && Number(privateData.incorrectVotes || 0) === 0,
+    cleanSweep: won && alignment === "Mafia" && mafiaStarting.length >= 2 && mafiaStarting.every(item => item.alive),
+    sherlocksIntuition: privateData.sherlocksIntuition === true,
+    muzzled: privateData.muzzled === true,
+    clutchSave: Number(privateData.clutchSaves || 0) >= 2
+  };
+
   const statsRef = doc(db, "leaderboard", currentUser.uid);
   const gameRef = doc(db, "leaderboard", currentUser.uid, "games", code);
+  let newlyUnlocked = [];
 
   await runTransaction(db, async transaction => {
     const statsSnapshot = await transaction.get(statsRef);
@@ -835,7 +854,17 @@ async function recordMyGameStats() {
     const alignmentWins = incrementMap(old.alignmentWins, alignment, won ? 1 : 0);
     const currentWinStreak = won ? Number(old.currentWinStreak || 0) + 1 : 0;
     const bestWinStreak = Math.max(Number(old.bestWinStreak || 0), currentWinStreak);
+    const unlocked = new Set(old.unlockedAchievements || []);
 
+    ACHIEVEMENTS.forEach(item => {
+      let achieved = false;
+      if (item.kind === "wins") achieved = wins >= item.target;
+      else if (item.kind === "role") achieved = Number(roleWins[item.role] || 0) >= 1;
+      else achieved = Boolean(gameFlags[item.flag]);
+      if (achieved) unlocked.add(item.id);
+    });
+
+    newlyUnlocked = [...unlocked].filter(id => !(old.unlockedAchievements || []).includes(id));
     transaction.set(statsRef, {
       uid: currentUser.uid,
       displayName: player.name || getDisplayName(),
@@ -852,6 +881,8 @@ async function recordMyGameStats() {
       mostPlayedAlignment: mostPlayedKey(alignmentGames),
       currentWinStreak,
       bestWinStreak,
+      unlockedAchievements: [...unlocked],
+      activeTitle: old.activeTitle || profile.activeTitle || "",
       updatedAt: serverTimestamp()
     });
     transaction.set(gameRef, {
@@ -860,11 +891,16 @@ async function recordMyGameStats() {
       alignment,
       winner: room.winner,
       won,
+      unlockedAchievements: newlyUnlocked,
       completedAt: serverTimestamp()
     });
   });
 
   await loadMyStats();
+  if (newlyUnlocked.length) {
+    const names = newlyUnlocked.map(id => achievementById(id)?.name).filter(Boolean);
+    showNotice("Achievement unlocked: " + names.join(", "));
+  }
 }
 
 function openStatistics() {
