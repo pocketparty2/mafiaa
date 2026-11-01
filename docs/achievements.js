@@ -73,3 +73,12 @@ export function applyTitleDesign(element, id) {
   element.style.padding = "0";
   element.style.borderRadius = "0";
 }
+
+
+export function roleTitleColors(role) {
+  const achievement = ACHIEVEMENTS.find(item =>
+    (item.kind === "role" && item.role === role) ||
+    (role === "Bounty Hunter" && item.id === "its-not-personal")
+  );
+  return achievement?.colors || ["#888888", "#555555"];
+}
