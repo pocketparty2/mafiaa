@@ -1,4 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, achievementById, applyTitleDesign } from "./achievements.js";
 import {  
   getAuth, 
   createUserWithEmailAndPassword,
@@ -52,8 +53,9 @@ const MAX_PLAYERS = 12;
 const MIN_PLAYERS = 3;
 
 let currentUser = null;
-let profile = { displayName: "", avatarData: "" };
+let profile = { displayName: "", avatarData: "", activeTitle: "" };
 let pendingSignupAvatar = "";
+let myStats = {};
 let pendingEditAvatar = null;
 let signupMode = false;
 
@@ -285,6 +287,7 @@ function renderAvatar(element, data, name = "") {
 
 function renderProfile() {
   const name = getDisplayName();
+  renderPlayerTitle($("profile-active-title"), profile.activeTitle);
 
   if ($("profile-display-name")) {
     $("profile-display-name").textContent = name;
@@ -321,13 +324,15 @@ async function saveProfileDocument(displayName, avatarData) {
   await setDoc(doc(db, "users", currentUser.uid), {
     displayName: cleanName(displayName),
     avatarData: avatarData || "",
+    activeTitle: profile.activeTitle || "",
     updatedAt: serverTimestamp()
   });
 }
 
 async function loadMyStats() {
   const snapshot = await getDoc(doc(db, "leaderboard", currentUser.uid));
-  renderMyStats(snapshot.exists() ? snapshot.data() : null);
+  myStats = snapshot.exists() ? snapshot.data() : {};
+  renderMyStats(myStats);
 }
 
 function renderMyStats(stats) {
@@ -343,6 +348,106 @@ function renderMyStats(stats) {
   $("my-stat-alignment").textContent = stats?.mostPlayedAlignment || "—";
   renderBreakdown($("my-role-breakdown"), stats?.roleGames, stats?.roleWins);
   renderBreakdown($("my-alignment-breakdown"), stats?.alignmentGames, stats?.alignmentWins);
+  myStats = stats || {};
+  renderAchievements(myStats);
+  renderTitleSelector(myStats);
+}
+
+function renderPlayerTitle(element, id) {
+  if (!element) return;
+  applyTitleDesign(element, id);
+}
+
+function achievementProgress(stats, achievement) {
+  if (achievement.kind === "wins") return { value: Number(stats.wins || 0), target: achievement.target };
+  if (achievement.kind === "role") return { value: Number(stats.roleWins?.[achievement.role] || 0), target: 1 };
+  return { value: (stats.unlockedAchievements || []).includes(achievement.id) ? 1 : 0, target: 1 };
+}
+
+function renderAchievements(stats) {
+  const container = $("achievement-categories");
+  if (!container) return;
+  container.replaceChildren();
+  const unlocked = new Set(stats.unlockedAchievements || []);
+  ACHIEVEMENT_CATEGORIES.forEach(category => {
+    const section = document.createElement("section");
+    section.className = "achievement-category";
+    const heading = document.createElement("h3");
+    heading.textContent = category;
+    section.append(heading);
+    const grid = document.createElement("div");
+    grid.className = "achievement-grid";
+    ACHIEVEMENTS.filter(item => item.category === category).forEach(item => {
+      const isUnlocked = unlocked.has(item.id);
+      const progress = achievementProgress(stats, item);
+      const card = document.createElement("article");
+      card.className = "achievement-card" + (isUnlocked ? " is-unlocked" : "");
+      const title = document.createElement("strong");
+      title.textContent = item.name;
+      const requirement = document.createElement("p");
+      requirement.textContent = item.requirement;
+      const reward = document.createElement("span");
+      reward.className = "achievement-reward";
+      reward.textContent = "Title: " + item.title;
+      const status = document.createElement("span");
+      status.className = "achievement-status";
+      status.textContent = isUnlocked ? "UNLOCKED" : "LOCKED";
+      const progressText = document.createElement("span");
+      progressText.className = "achievement-progress-text";
+      progressText.textContent = item.kind === "wins" || item.kind === "role"
+        ? Math.min(progress.value, progress.target) + " / " + progress.target
+        : (isUnlocked ? "Completed" : "Not yet completed");
+      const bar = document.createElement("div");
+      bar.className = "achievement-progress-track";
+      const fill = document.createElement("div");
+      fill.className = "achievement-progress-fill";
+      fill.style.width = Math.min(100, progress.value / progress.target * 100) + "%";
+      bar.append(fill);
+      card.append(title, requirement, reward, status, progressText, bar);
+      grid.append(card);
+    });
+    section.append(grid);
+    container.append(section);
+  });
+}
+
+function renderTitleSelector(stats) {
+  const select = $("active-title-select");
+  if (!select) return;
+  const unlocked = (stats.unlockedAchievements || []).map(achievementById).filter(Boolean);
+  select.replaceChildren();
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "No title";
+  select.append(none);
+  unlocked.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = item.title;
+    select.append(option);
+  });
+  select.value = profile.activeTitle || "";
+  select.disabled = !unlocked.length;
+}
+
+async function saveActiveTitle(id) {
+  if (!currentUser) return;
+  const selected = id && (myStats.unlockedAchievements || []).includes(id) ? id : "";
+  profile.activeTitle = selected;
+  await setDoc(doc(db, "users", currentUser.uid), {
+    displayName: getDisplayName(),
+    avatarData: profile.avatarData || "",
+    activeTitle: selected,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await setDoc(doc(db, "leaderboard", currentUser.uid), {
+    uid: currentUser.uid,
+    activeTitle: selected
+  }, { merge: true });
+  if (roomCode) await updateDoc(playerRef(currentUser.uid), { activeTitle: selected });
+  renderProfile();
+  renderTitleSelector(myStats);
+  showNotice(selected ? "Your title has been updated!" : "Your title has been removed.");
 }
 
 function renderBreakdown(container, gamesMap, winsMap) {
@@ -373,12 +478,14 @@ async function loadProfile() {
     const data = snapshot.data();
     profile = {
       displayName: cleanName(data.displayName),
-      avatarData: data.avatarData || ""
+      avatarData: data.avatarData || "",
+      activeTitle: data.activeTitle || ""
     };
   } else {
     profile = {
       displayName: cleanName(currentUser.email?.split("@")[0]) || "Player",
-      avatarData: ""
+      avatarData: "",
+      activeTitle: ""
     };
   }
 
@@ -437,7 +544,8 @@ $("auth-form").addEventListener("submit", async event => {
 
       profile = {
         displayName,
-        avatarData: pendingSignupAvatar || ""
+        avatarData: pendingSignupAvatar || "",
+        activeTitle: ""
       };
 
       await saveProfileDocument(profile.displayName, profile.avatarData);
@@ -626,7 +734,7 @@ $("save-profile").addEventListener("click", async () => {
 
     await saveProfileDocument(displayName, avatarData);
 
-    profile = { displayName, avatarData };
+    profile = { ...profile, displayName, avatarData };
     pendingEditAvatar = null;
 
     $("current-password").value = "";
@@ -699,6 +807,7 @@ $("create-form").addEventListener("submit", async event => {
       uid: currentUser.uid,
       name,
       avatarData: profile.avatarData || "",
+      activeTitle: profile.activeTitle || "",
       ready: false,
       alive: true,
       roleReveal: null,
@@ -769,6 +878,7 @@ $("join-form").addEventListener("submit", async event => {
       uid: currentUser.uid,
       name: getDisplayName(),
       avatarData: profile.avatarData || "",
+      activeTitle: profile.activeTitle || "",
       ready: false,
       alive: true,
       roleReveal: null,
@@ -989,6 +1099,9 @@ $("final-results-home").addEventListener("click", () => {
 });
 
 $("statistics-button").addEventListener("click", openStatistics);
+$("active-title-select").addEventListener("change", event => {
+  saveActiveTitle(event.target.value).catch(error => showNotice(friendlyError(error), true));
+});
 $("statistics-back").addEventListener("click", closeStatistics);
 $("leaderboard-button").addEventListener("click", openLeaderboard);
 $("leaderboard-back").addEventListener("click", closeLeaderboard);
