@@ -1570,6 +1570,31 @@ function renderGame() {
     $("role-name").textContent = role;
     $("role-description").textContent = roleInfo[role]?.description || "";
     $("team-info").textContent = roleInfo[role]?.team || "";
+    const roleCard = $("role-card");
+    roleCard.dataset.role = role.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    roleCard.style.setProperty("--role-accent", ({
+      Mafia: "#d94b55", Silencer: "#8c5bd6", Detective: "#4b8fe2",
+      Doctor: "#45b98c", Mayor: "#d5a83f", Tracker: "#4ca8a0",
+      Knight: "#a5a9c8", Jester: "#d76bb8", Thief: "#c58a45",
+      "Bounty Hunter": "#e07843", Townsperson: "#6caa75"
+    })[role] || "#8b8b8b");
+    const targetPanel = $("bounty-target-panel");
+    if (targetPanel) {
+      targetPanel.classList.toggle("hidden", role !== "Bounty Hunter");
+      targetPanel.replaceChildren();
+      if (role === "Bounty Hunter") {
+        const targetUid = privateByUid[currentUser.uid]?.bountyTargetUid;
+        const target = players.find(player => player.id === targetUid);
+        const heading = document.createElement("strong");
+        heading.textContent = "TARGET";
+        const avatar = document.createElement("div");
+        avatar.className = "profile-avatar bounty-target-avatar";
+        renderAvatar(avatar, target?.avatarData || "", target?.name || "Target");
+        const targetName = document.createElement("span");
+        targetName.textContent = target?.name || "Assigned target";
+        targetPanel.append(heading, avatar, targetName);
+      }
+    }
 
     const investigation = privateByUid[currentUser.uid]?.investigationResult;
     const tracking = privateByUid[currentUser.uid]?.trackerResult;
@@ -1591,6 +1616,9 @@ function renderGame() {
     $("role-description").textContent = "";
     $("investigation-result").textContent = "";
     $("team-info").textContent = "";
+    $("role-card").removeAttribute("data-role");
+    $("role-card").style.removeProperty("--role-accent");
+    if ($("bounty-target-panel")) $("bounty-target-panel").classList.add("hidden");
   }
 
   const winnerMessage = room.winner === "Mafia"
@@ -1949,8 +1977,9 @@ function renderPlayers() {
         player.roleReveal
       ) {
         const badge = document.createElement("span");
-        badge.className = "role-badge";
+        badge.className = "role-badge role-reveal-badge";
         badge.textContent = player.roleReveal;
+        badge.dataset.role = player.roleReveal.toLowerCase().replace(/[^a-z0-9]+/g, "-");
         card.append(badge);
       }
 
@@ -3227,7 +3256,9 @@ async function leaveCurrentRoom(returnHome = true) {
 
   try {
     const remaining = players.filter(player => player.id !== uid);
-    const nextHost = remaining[0]?.id || null;
+    const nextHost = remaining.length
+      ? remaining[Math.floor(Math.random() * remaining.length)].id
+      : null;
 
     await runTransaction(db, async transaction => {
       const ref = roomRef(code);
