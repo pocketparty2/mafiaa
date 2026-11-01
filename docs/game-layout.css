@@ -1299,3 +1299,54 @@
   font-size: 9px;
   font-weight: 900;
 }
+
+
+/* Mafia team panel in the private role card */
+.mafia-team-panel {
+  display: grid;
+  gap: 9px;
+  margin-top: 13px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--role-accent, #888) 65%, var(--role-accent-bottom, #555));
+  border-radius: 10px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--role-accent, #888) 18%, transparent),
+    color-mix(in srgb, var(--role-accent-bottom, #555) 14%, transparent));
+}
+.mafia-team-panel > strong {
+  color: var(--role-accent, inherit);
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+.mafia-team-members {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 8px;
+}
+.mafia-team-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.12);
+}
+.mafia-team-avatar { width: 38px; height: 38px; flex: 0 0 38px; }
+.mafia-team-member-details {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.mafia-team-member-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 800;
+}
+.mafia-team-member-role {
+  width: fit-content;
+  font-size: 10px;
+  font-weight: 900;
+}
