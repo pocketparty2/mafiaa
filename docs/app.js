@@ -379,54 +379,63 @@ function achievementProgress(stats, achievement) {
   return { value: (stats.unlockedAchievements || []).includes(achievement.id) ? 1 : 0, target: 1 };
 }
 
+let activeAchievementCategory = ACHIEVEMENT_CATEGORIES[0];
+
 function renderAchievements(stats) {
   const container = $("achievement-categories");
-  if (!container) return;
+  const tabs = $("achievement-tabs");
+  if (!container || !tabs) return;
+  tabs.replaceChildren();
   container.replaceChildren();
   const unlocked = new Set(stats.unlockedAchievements || []);
+
   ACHIEVEMENT_CATEGORIES.forEach(category => {
-    const section = document.createElement("section");
-    section.className = "achievement-category";
-    const heading = document.createElement("h3");
-    heading.textContent = category;
-    section.append(heading);
-    const grid = document.createElement("div");
-    grid.className = "achievement-grid";
-    ACHIEVEMENTS.filter(item => item.category === category).forEach(item => {
-      const isUnlocked = unlocked.has(item.id);
-      const progress = achievementProgress(stats, item);
-      const card = document.createElement("article");
-      card.className = "achievement-card" + (isUnlocked ? " is-unlocked" : "");
-      const title = document.createElement("strong");
-      title.textContent = item.name;
-      const requirement = document.createElement("p");
-      requirement.textContent = item.requirement;
-      const rewardLabel = document.createElement("span");
-      rewardLabel.className = "achievement-reward-label";
-      rewardLabel.textContent = "TITLE REWARD";
-      const reward = document.createElement("span");
-      reward.className = "achievement-reward";
-      applyTitleDesign(reward, item.id);
-      const status = document.createElement("span");
-      status.className = "achievement-status";
-      status.textContent = isUnlocked ? "UNLOCKED" : "LOCKED";
-      const progressText = document.createElement("span");
-      progressText.className = "achievement-progress-text";
-      progressText.textContent = item.kind === "wins" || item.kind === "role"
-        ? Math.min(progress.value, progress.target) + " / " + progress.target
-        : (isUnlocked ? "Completed" : "Not yet completed");
-      const bar = document.createElement("div");
-      bar.className = "achievement-progress-track";
-      const fill = document.createElement("div");
-      fill.className = "achievement-progress-fill";
-      fill.style.width = Math.min(100, progress.value / progress.target * 100) + "%";
-      bar.append(fill);
-      card.append(title, requirement, rewardLabel, reward, status, progressText, bar);
-      grid.append(card);
+    const categoryItems = ACHIEVEMENTS.filter(item => item.category === category);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "achievement-tab" + (activeAchievementCategory === category ? " is-active" : "");
+    button.textContent = category;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(activeAchievementCategory === category));
+    button.addEventListener("click", () => {
+      activeAchievementCategory = category;
+      renderAchievements(stats);
     });
-    section.append(grid);
-    container.append(section);
+    tabs.append(button);
   });
+
+  const grid = document.createElement("div");
+  grid.className = "achievement-grid";
+  ACHIEVEMENTS.filter(item => item.category === activeAchievementCategory).forEach(item => {
+    const isUnlocked = unlocked.has(item.id);
+    const progress = achievementProgress(stats, item);
+    const card = document.createElement("article");
+    card.className = "achievement-card" + (isUnlocked ? " is-unlocked" : "");
+    const title = document.createElement("strong");
+    title.textContent = item.name;
+    const requirement = document.createElement("p");
+    requirement.textContent = item.requirement;
+    const reward = document.createElement("span");
+    reward.className = "achievement-reward";
+    applyTitleDesign(reward, item.id);
+    const progressText = document.createElement("span");
+    progressText.className = "achievement-progress-text";
+    progressText.textContent = item.kind === "wins" || item.kind === "role"
+      ? Math.min(progress.value, progress.target) + " / " + progress.target
+      : (isUnlocked ? "Completed" : "Not completed");
+    const bar = document.createElement("div");
+    bar.className = "achievement-progress-track";
+    const fill = document.createElement("div");
+    fill.className = "achievement-progress-fill";
+    fill.style.width = Math.min(100, progress.value / progress.target * 100) + "%";
+    bar.append(fill);
+    const status = document.createElement("span");
+    status.className = "achievement-status";
+    status.textContent = isUnlocked ? "UNLOCKED" : "LOCKED";
+    card.append(title, requirement, reward, progressText, bar, status);
+    grid.append(card);
+  });
+  container.append(grid);
 }
 
 function renderTitleSelector(stats) {
