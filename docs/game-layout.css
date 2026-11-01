@@ -1150,5 +1150,8 @@
   .achievement-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 390px) {
-  .achievement-grid { grid-template-columns: 1fr; }
+  .achievement-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  .achievement-card { padding: 6px; }
+  .achievement-card > strong { font-size: 10px; }
+  .achievement-card p { font-size: 8px; }
 }
