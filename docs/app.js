@@ -1627,6 +1627,7 @@ function renderGame() {
       targetPanel.classList.toggle("hidden", role !== "Bounty Hunter");
       targetPanel.replaceChildren();
       if (role === "Bounty Hunter") {
+        applyRoleDesign(targetPanel, role);
         const targetUid = privateByUid[currentUser.uid]?.bountyTargetUid;
         const target = players.find(player => player.id === targetUid);
         const heading = document.createElement("strong");
