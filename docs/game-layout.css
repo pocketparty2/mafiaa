@@ -1200,3 +1200,25 @@
     padding: 7px;
   }
 }
+
+
+/* Lobby timer controls */
+.timer-settings { margin: 12px 0 16px; }
+.timer-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.timer-settings-grid label { display: grid; gap: 5px; font-size: 10px; font-weight: 800; }
+.timer-settings-grid input { width: 100%; min-width: 0; box-sizing: border-box; }
+.timer-settings-hint { margin: 6px 0 0; font-size: 9px; }
+.night-announcement, .spectator-notice {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border, rgba(127,127,127,.25));
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.night-announcement { background: rgba(127,127,127,.09); font-weight: 700; }
+.spectator-notice { background: rgba(139,131,255,.09); color: var(--muted, inherit); font-size: 10px; font-weight: 800; letter-spacing: .04em; }
+@media (max-width: 390px) {
+  .timer-settings-grid { gap: 6px; }
+  .timer-settings-grid label { font-size: 9px; }
+}
