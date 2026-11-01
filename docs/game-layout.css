@@ -1222,3 +1222,40 @@
   .timer-settings-grid { gap: 6px; }
   .timer-settings-grid label { font-size: 9px; }
 }
+
+
+/* Role identity styling */
+#role-card {
+  border-color: color-mix(in srgb, var(--role-accent, #888) 55%, var(--border, #888));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--role-accent, #888) 16%, transparent), transparent 70%);
+}
+#role-card #role-name { color: var(--role-accent, inherit); }
+.role-reveal-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--role-accent, #888) 60%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--role-accent, #888) 16%, transparent);
+  color: var(--role-accent, inherit); font-weight: 900;
+}
+.role-reveal-badge[data-role="mafia"] { --role-accent: #d94b55; }
+.role-reveal-badge[data-role="silencer"] { --role-accent: #8c5bd6; }
+.role-reveal-badge[data-role="detective"] { --role-accent: #4b8fe2; }
+.role-reveal-badge[data-role="doctor"] { --role-accent: #45b98c; }
+.role-reveal-badge[data-role="mayor"] { --role-accent: #d5a83f; }
+.role-reveal-badge[data-role="tracker"] { --role-accent: #4ca8a0; }
+.role-reveal-badge[data-role="knight"] { --role-accent: #a5a9c8; }
+.role-reveal-badge[data-role="jester"] { --role-accent: #d76bb8; }
+.role-reveal-badge[data-role="thief"] { --role-accent: #c58a45; }
+.role-reveal-badge[data-role="bounty-hunter"] { --role-accent: #e07843; }
+.role-reveal-badge[data-role="townsperson"] { --role-accent: #6caa75; }
+.bounty-target-panel {
+  display: grid; grid-template-columns: auto 42px 1fr; align-items: center;
+  gap: 9px; margin-top: 13px; padding: 10px;
+  border: 1px solid #e07843; border-radius: 10px; background: rgba(224,120,67,.12);
+}
+.bounty-target-panel strong { color: #e07843; font-size: 10px; letter-spacing: .12em; }
+.bounty-target-avatar { width: 42px; height: 42px; }
+.bounty-target-panel span { font-weight: 800; }
+.rematch-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0; }
+.rematch-controls p { flex-basis: 100%; margin: 0; }
