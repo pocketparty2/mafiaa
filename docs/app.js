@@ -934,20 +934,21 @@ function mostPlayedKey(map) {
 async function recordMyGameStats() {
   if (!currentUser || !roomCode || !room || room.phase !== "finished") return;
   const code = roomCode;
+  const finishedRoom = room;
   const player = players.find(item => item.id === currentUser.uid);
   const privateSnapshot = await getDoc(privateRef(currentUser.uid));
   const privateData = privateSnapshot.exists() ? privateSnapshot.data() : (privateByUid[currentUser.uid] || {});
   const actualRole = privateData.role;
   const role = privateData.roleStolen ? "Thief" : actualRole;
-  if (!player || !actualRole || !room.winner) return;
+  if (!player || !actualRole || !finishedRoom?.winner) return;
 
   const alignment = alignmentForRole(actualRole);
-  const won = room.winner === "Jester"
+  const won = finishedRoom.winner === "Jester"
     ? actualRole === "Jester"
-    : room.winner === "Bounty Hunter"
-      ? actualRole === "Bounty Hunter" && (room.bountyHunterWinnerUids || []).includes(currentUser.uid)
-      : room.winner === alignment && alignment !== "Neutral";
-  const finalResults = Array.isArray(room.finalResults) ? room.finalResults : [];
+    : finishedRoom.winner === "Bounty Hunter"
+      ? actualRole === "Bounty Hunter" && (finishedRoom.bountyHunterWinnerUids || []).includes(currentUser.uid)
+      : finishedRoom.winner === alignment && alignment !== "Neutral";
+  const finalResults = Array.isArray(finishedRoom.finalResults) ? finishedRoom.finalResults : [];
   const ownResult = finalResults.find(item => item.uid === currentUser.uid) || {};
   const mafiaStarting = finalResults.filter(item => ["Mafia", "Silencer"].includes(item.startingRole));
   const gameFlags = {
@@ -1017,7 +1018,7 @@ async function recordMyGameStats() {
       roomCode: code,
       role,
       alignment,
-      winner: room.winner,
+      winner: finishedRoom.winner,
       won,
       unlockedAchievements: newlyUnlocked,
       completedAt: serverTimestamp()
