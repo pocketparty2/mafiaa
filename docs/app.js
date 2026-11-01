@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
-import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, achievementById, applyTitleDesign } from "./achievements.js";
+import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, achievementById, applyTitleDesign } from "./achievements.js"; 
 import {  
   getAuth, 
   createUserWithEmailAndPassword,
