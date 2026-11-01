@@ -259,13 +259,16 @@ service cloud.firestore {
             && request.auth.uid == playerUid
             && isMember(code)
             && request.resource.data.diff(resource.data)
-              .affectedKeys().hasOnly(['ready', 'activeTitle'])
+              .affectedKeys().hasOnly(['ready', 'activeTitle', 'playAgain'])
             && (
               (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ready'])
                 && request.resource.data.ready is bool)
               || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeTitle'])
                 && request.resource.data.activeTitle is string
                 && request.resource.data.activeTitle.size() <= 100)
+              || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playAgain'])
+                && request.resource.data.playAgain is bool
+                && get(roomPath(code)).data.phase == 'finished')
             )
           );
 
